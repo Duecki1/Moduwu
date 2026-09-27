@@ -1,0 +1,12 @@
+[package]
+name = "moduwu-design"
+version = "1.1.0"
+edition = "2021"
+rust-version = "1.92.0"
+authors = ["Duecki <dueckis@dueckis.de>"]
+license = "GPL-3.0-or-later"
+readme = "README.md"
+description = "Moduwu Design: reusable egui themes, controls, and responsive layout primitives"
+
+[dependencies]
+egui = "0.35"
