@@ -12,8 +12,10 @@ mod forms;
 mod frames;
 mod menus;
 mod metrics;
+mod number_field;
 mod presets;
 mod responsive;
+mod slider;
 mod theme;
 
 pub use buttons::{
@@ -25,10 +27,10 @@ pub use buttons::{
     toolbar_button, InteractionVisualState, InteractionVisuals, PrimaryButton,
 };
 pub use dialogs::{
-    dialog_button_row, dialog_confirmation_buttons, dialog_keyboard_action, dialog_window,
-    request_initial_focus, DialogAction, DialogKeyboard, DialogWindow, DIALOG_MARGIN,
-    DIALOG_TEXT_FIELD_WIDTH, DIALOG_WIDTH_DEFAULT, DIALOG_WIDTH_FORM, DIALOG_WIDTH_LARGE,
-    DIALOG_WIDTH_NARROW, DIALOG_WIDTH_WIDE,
+    dialog_button_row, dialog_confirmation_buttons, dialog_keyboard_action, dialog_text_field,
+    dialog_window, request_initial_focus, DialogAction, DialogKeyboard, DialogWindow,
+    DIALOG_MARGIN, DIALOG_TEXT_FIELD_WIDTH, DIALOG_WIDTH_DEFAULT, DIALOG_WIDTH_FORM,
+    DIALOG_WIDTH_LARGE, DIALOG_WIDTH_NARROW, DIALOG_WIDTH_WIDE,
 };
 pub use forms::{
     checkbox_with_help, combo_box, form_combo, form_combo_with_help, form_row, form_row_with_help,
@@ -50,9 +52,13 @@ pub use metrics::{
     METRICS, PANEL_TITLE_HEIGHT, PANEL_TITLE_TEXT_SIZE, SPACE_LG, SPACE_MD, SPACE_SM, SPACE_XS,
     SPACE_XXS, TOOLBAR_HEIGHT, TOOLBAR_ICON_EDGE, TOOL_RAIL_ICON_EDGE, WINDOW_MARGIN,
 };
+pub use number_field::{arrow_step, step_focused, NumberField};
 pub use presets::Design;
 pub use responsive::{
     card_gap, compact_portrait_for_platform, content_margin, is_compact_portrait,
     persisted_panel_width, ResponsiveWidth, ScreenLayout,
+};
+pub use slider::{
+    lock_slider_scroll, slider_scroll_locked, Slider, SliderLayout, SliderMetrics, SliderResponse,
 };
 pub use theme::{Palette, Theme, ThemeMode};

@@ -1,6 +1,6 @@
 [package]
 name = "moduwu-design"
-version = "1.1.0"
+version = "2.0.0"
 edition = "2021"
 rust-version = "1.92.0"
 authors = ["Duecki <dueckis@dueckis.de>"]
@@ -10,3 +10,10 @@ description = "Moduwu Design: reusable egui themes, controls, and responsive lay
 
 [dependencies]
 egui = "0.35"
+
+[dev-dependencies]
+eframe = { version = "0.35", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
+
+[[example]]
+name = "gallery"
+test = true

@@ -3,6 +3,29 @@
 A standalone Rust library for egui 0.35, extracted from CalibRaw. It provides
 four theme presets (Obsidian Blue, Obsidian Red, Porcelain, and Daylight),
 custom palette support, spacing and sizing metrics, cards, toolbar rows,
-buttons, form controls, menus, dialogs, and responsive layout helpers.
+buttons, form controls, numeric fields, sliders, menus, dialogs, and
+responsive layout helpers.
+
+## Gallery
+
+```sh
+cargo run --example gallery
+```
+
+The gallery shows every reusable control in each theme. Desktop and Android
+metrics can be switched at runtime, and the "Enabled" toggle shows disabled
+states; Tab moves keyboard focus. `cargo test` renders it headlessly in every
+combination.
+
+## Changes in 2.0
+
+- `NumberField`: a drag-value field with focus-aware arrow stepping and repeat,
+  display precision, suffixes, explicit ids and commit-after-edit updates.
+- `Slider`: a labelled slider with a value field, scroll-friendly dragging
+  (`slider_scroll_locked`), double-click reset, keyboard stepping, gradients and
+  AccessKit slider semantics.
+- Runtime metrics: `Theme::apply_with_metrics` installs `Metrics` that controls
+  read through `Metrics::of`; `Theme::apply` keeps the build platform's.
+- Breaking: `Metrics` has a new `touch_layout` field.
 
 Licensed under GPL-3.0-or-later; see [COPYING](COPYING).

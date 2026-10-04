@@ -1,6 +1,6 @@
 use egui::{self, Color32, Margin, Stroke};
 
-use crate::metrics::{CARD_RADIUS, CONTROL_HEIGHT, SPACE_LG, SPACE_SM, WINDOW_MARGIN};
+use crate::metrics::{Metrics, CARD_RADIUS, METRICS, SPACE_LG, SPACE_SM};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ThemeMode {
@@ -51,7 +51,16 @@ impl Theme {
         Self::new(ThemeMode::Light, palette)
     }
 
+    /// Applies the theme with the build platform's [`METRICS`].
     pub fn apply(self, ctx: &egui::Context) {
+        self.apply_with_metrics(ctx, METRICS);
+    }
+
+    /// Applies the theme with `metrics`, which Moduwu controls then use in
+    /// place of the build platform's. Galleries use this to preview another
+    /// platform's layout.
+    pub fn apply_with_metrics(self, ctx: &egui::Context, metrics: Metrics) {
+        metrics.install(ctx);
         let palette = self.palette;
         let egui_theme = if self.mode.is_dark() {
             egui::Theme::Dark
@@ -137,8 +146,8 @@ impl Theme {
         style.spacing.slider_width = 220.0;
         style.spacing.item_spacing = egui::vec2(SPACE_SM, SPACE_SM);
         style.spacing.button_padding = egui::vec2(10.0, 5.0);
-        style.spacing.interact_size.y = CONTROL_HEIGHT;
-        style.spacing.window_margin = Margin::same(WINDOW_MARGIN);
+        style.spacing.interact_size.y = metrics.control_height;
+        style.spacing.window_margin = Margin::same(metrics.window_margin);
         style.spacing.menu_margin = Margin::same(SPACE_SM as i8);
         style.spacing.indent = SPACE_LG;
         ctx.set_style_of(egui_theme, style);
@@ -173,8 +182,25 @@ mod tests {
         let ctx = egui::Context::default();
         Theme::dark(DARK).apply(&ctx);
         let style = ctx.style_of(ctx.theme());
-        assert_eq!(style.spacing.interact_size.y, CONTROL_HEIGHT);
-        assert_eq!(style.spacing.window_margin, Margin::same(WINDOW_MARGIN));
+        assert_eq!(style.spacing.interact_size.y, METRICS.control_height);
+        assert_eq!(
+            style.spacing.window_margin,
+            Margin::same(METRICS.window_margin)
+        );
         assert_eq!(style.visuals.selection.bg_fill, DARK.accent);
+    }
+
+    #[test]
+    fn explicit_metrics_size_controls_for_another_platform() {
+        let ctx = egui::Context::default();
+        let other = Metrics::for_platform(!METRICS.touch_layout);
+        Theme::dark(DARK).apply_with_metrics(&ctx, other);
+        let style = ctx.style_of(ctx.theme());
+        assert_eq!(style.spacing.interact_size.y, other.control_height);
+        assert_eq!(Metrics::of(&ctx), other);
+        let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
+            let response = crate::secondary_button(ui, "Button");
+            assert_eq!(response.rect.height(), other.control_height);
+        });
     }
 }

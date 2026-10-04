@@ -1,7 +1,8 @@
 use egui::{self, InnerResponse, Response, Ui};
 
 use crate::buttons::{destructive_button, primary_action_button, secondary_button};
-use crate::metrics::{CONTROL_HEIGHT, SPACE_SM, SPACE_XS, WINDOW_MARGIN};
+use crate::forms::singleline_text_edit;
+use crate::metrics::{control_height, Metrics, SPACE_SM, SPACE_XS, WINDOW_MARGIN};
 
 pub const DIALOG_WIDTH_NARROW: f32 = 360.0;
 pub const DIALOG_WIDTH_FORM: f32 = 420.0;
@@ -99,7 +100,7 @@ pub fn dialog_button_row<R>(
     ui.separator();
     ui.add_space(SPACE_XS);
     ui.allocate_ui_with_layout(
-        egui::vec2(ui.available_width().max(1.0), CONTROL_HEIGHT),
+        egui::vec2(ui.available_width().max(1.0), control_height(ui)),
         egui::Layout::right_to_left(egui::Align::Center).with_main_wrap(true),
         |ui| {
             ui.spacing_mut().item_spacing.x = SPACE_SM;
@@ -148,6 +149,21 @@ pub fn dialog_confirmation_buttons(
         action = dialog_keyboard_action(ui, keyboard, confirm_enabled);
     }
     action
+}
+
+/// The single-line text field for dialogs: control height, filling the
+/// available width. egui caps a field at the space it is given, margins
+/// included, so the field never widens the window.
+pub fn dialog_text_field(
+    ui: &mut Ui,
+    text: &mut dyn egui::TextBuffer,
+    id_salt: impl egui::AsIdSalt,
+    hint: &str,
+) -> Response {
+    ui.add_sized(
+        [ui.available_width(), control_height(ui)],
+        singleline_text_edit(text).hint_text(hint).id_salt(id_salt),
+    )
 }
 
 pub struct DialogWindow {
@@ -206,9 +222,9 @@ impl DialogWindow {
         } = self;
         // Two consent actions wrap into separate rows on narrow screens.
         let footer_reserve = if ctx.content_rect().width() < 320.0 {
-            CONTROL_HEIGHT * 2.0 + 32.0
+            Metrics::of(ctx).control_height * 2.0 + 32.0
         } else {
-            CONTROL_HEIGHT + 16.0
+            Metrics::of(ctx).control_height + 16.0
         };
         window.show(ctx, |ui| {
             ui.heading(title);
@@ -266,6 +282,20 @@ pub fn dialog_window(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::metrics::CONTROL_HEIGHT;
+
+    #[test]
+    fn dialog_text_field_fills_the_width_at_control_height() {
+        let ctx = egui::Context::default();
+        let mut text = String::from("Name");
+        let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
+            ui.set_width(240.0);
+            let width = ui.available_width();
+            let response = dialog_text_field(ui, &mut text, "name", "Hint");
+            assert_eq!(response.rect.width(), width);
+            assert_eq!(response.rect.height(), CONTROL_HEIGHT);
+        });
+    }
 
     #[test]
     fn dialog_window_shrinks_to_short_content() {

@@ -19,6 +19,8 @@ pub struct Metrics {
     pub floating_action_edge: f32,
     pub floating_action_margin: f32,
     pub window_margin: i8,
+    /// Touch-first layouts: compact rows in portrait viewports (Android).
+    pub touch_layout: bool,
 }
 
 pub const DESKTOP_CONTROL_HEIGHT: f32 = 32.0;
@@ -53,8 +55,29 @@ impl Metrics {
             floating_action_edge: if android { 52.0 } else { 46.0 },
             floating_action_margin: 12.0,
             window_margin: if android { 16 } else { 12 },
+            touch_layout: android,
         }
     }
+
+    /// The metrics in effect for `ctx`: those installed by
+    /// [`crate::Theme::apply_with_metrics`], otherwise [`METRICS`].
+    pub fn of(ctx: &egui::Context) -> Self {
+        ctx.data(|data| data.get_temp::<Self>(metrics_id()))
+            .unwrap_or(METRICS)
+    }
+
+    pub(crate) fn install(self, ctx: &egui::Context) {
+        ctx.data_mut(|data| data.insert_temp(metrics_id(), self));
+    }
+}
+
+fn metrics_id() -> egui::Id {
+    egui::Id::new("moduwu-metrics")
+}
+
+/// Height of a standard control under the metrics in effect.
+pub(crate) fn control_height(ui: &egui::Ui) -> f32 {
+    Metrics::of(ui.ctx()).control_height
 }
 
 pub const METRICS: Metrics = Metrics::for_platform(cfg!(target_os = "android"));
@@ -80,6 +103,14 @@ pub const WINDOW_MARGIN: i8 = METRICS.window_margin;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn installed_metrics_override_the_build_platform() {
+        let ctx = egui::Context::default();
+        assert_eq!(Metrics::of(&ctx), METRICS);
+        Metrics::ANDROID.install(&ctx);
+        assert_eq!(Metrics::of(&ctx), Metrics::ANDROID);
+    }
 
     #[test]
     fn platform_metrics_preserve_touch_targets() {

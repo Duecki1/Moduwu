@@ -1,7 +1,7 @@
 use egui::{self, Color32, InnerResponse, Response, RichText, Stroke, Ui, Vec2, Widget};
 
 use crate::metrics::{
-    CARD_RADIUS, CONTROL_HEIGHT, FLOATING_ACTION_EDGE, FLOATING_ACTION_MARGIN, SPACE_SM,
+    control_height, CARD_RADIUS, FLOATING_ACTION_EDGE, FLOATING_ACTION_MARGIN, SPACE_SM,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -122,16 +122,16 @@ impl Widget for PrimaryButton {
             .stroke(visuals.bg_stroke)
             .corner_radius(CARD_RADIUS);
         if let Some(width) = self.width {
-            ui.add_sized([width, CONTROL_HEIGHT], button)
+            ui.add_sized([width, control_height(ui)], button)
         } else {
-            ui.add(button.min_size(egui::vec2(0.0, CONTROL_HEIGHT)))
+            ui.add(button.min_size(egui::vec2(0.0, control_height(ui))))
         }
     }
 }
 
 pub fn full_width_button(ui: &mut Ui, label: impl Into<egui::WidgetText>) -> Response {
     ui.add_sized(
-        [ui.available_width().max(1.0), CONTROL_HEIGHT],
+        [ui.available_width().max(1.0), control_height(ui)],
         egui::Button::new(label.into()),
     )
 }
@@ -147,7 +147,7 @@ pub fn segmented_button(
     width: f32,
 ) -> Response {
     ui.add_sized(
-        [width, CONTROL_HEIGHT],
+        [width, control_height(ui)],
         egui::Button::new(label.into())
             .selected(selected)
             .frame(true)
@@ -157,7 +157,7 @@ pub fn segmented_button(
 }
 
 pub fn toolbar_button(ui: &mut Ui, label: impl Into<egui::WidgetText>, width: f32) -> Response {
-    ui.add_sized([width, CONTROL_HEIGHT], egui::Button::new(label.into()))
+    ui.add_sized([width, control_height(ui)], egui::Button::new(label.into()))
 }
 
 /// Square or rectangular glyph button that preserves the themed minimum control height.
@@ -223,7 +223,7 @@ pub fn secondary_button(ui: &mut Ui, label: impl Into<egui::WidgetText>) -> Resp
     ui.add(
         egui::Button::new(label.into())
             .corner_radius(CARD_RADIUS)
-            .min_size(egui::vec2(0.0, CONTROL_HEIGHT)),
+            .min_size(egui::vec2(0.0, control_height(ui))),
     )
 }
 
@@ -241,7 +241,7 @@ pub fn destructive_button(ui: &mut Ui, label: impl Into<egui::WidgetText>) -> Re
     ui.add(
         egui::Button::new(label.into().color(color))
             .corner_radius(CARD_RADIUS)
-            .min_size(egui::vec2(0.0, CONTROL_HEIGHT)),
+            .min_size(egui::vec2(0.0, control_height(ui))),
     )
 }
 
@@ -261,7 +261,7 @@ pub fn navigation_row(
     sense: egui::Sense,
 ) -> Response {
     ui.add_sized(
-        [ui.available_width().max(1.0), CONTROL_HEIGHT],
+        [ui.available_width().max(1.0), control_height(ui)],
         egui::Button::selectable(selected, ())
             .left_text(label)
             .truncate()
@@ -271,7 +271,7 @@ pub fn navigation_row(
 
 pub fn action_row<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) -> InnerResponse<R> {
     ui.horizontal_wrapped(|ui| {
-        ui.spacing_mut().interact_size.y = CONTROL_HEIGHT;
+        ui.spacing_mut().interact_size.y = control_height(ui);
         ui.spacing_mut().item_spacing = egui::vec2(SPACE_SM, SPACE_SM);
         add_contents(ui)
     })
@@ -312,6 +312,7 @@ pub fn floating_action_button(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::metrics::CONTROL_HEIGHT;
 
     #[test]
     fn disabled_interaction_state_overrides_other_flags() {

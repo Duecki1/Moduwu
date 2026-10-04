@@ -1,6 +1,6 @@
 use egui::{self, Align, InnerResponse, Layout, Margin, Response, RichText, Ui};
 
-use crate::metrics::{CONTROL_HEIGHT, HELP_BUTTON_EDGE, SPACE_SM, SPACE_XS};
+use crate::metrics::{control_height, Metrics, CONTROL_HEIGHT, SPACE_SM, SPACE_XS};
 use crate::responsive::ResponsiveWidth;
 
 pub fn heading_with_help(ui: &mut Ui, title: impl Into<RichText>, help: &str) {
@@ -19,7 +19,7 @@ pub fn checkbox_with_help(
 ) -> Response {
     let width = ui.available_width().max(1.0);
     ui.allocate_ui_with_layout(
-        egui::vec2(width, CONTROL_HEIGHT),
+        egui::vec2(width, control_height(ui)),
         Layout::left_to_right(Align::Center),
         |ui| ui.checkbox(checked, label).on_hover_text(help),
     )
@@ -33,7 +33,7 @@ pub fn property_row<R>(
 ) -> InnerResponse<R> {
     let width = ui.available_width().max(1.0);
     ui.allocate_ui_with_layout(
-        egui::vec2(width, CONTROL_HEIGHT),
+        egui::vec2(width, control_height(ui)),
         Layout::left_to_right(Align::Center),
         |ui| {
             ui.label(label);
@@ -74,7 +74,7 @@ pub fn form_row_with_help<R>(
         ui.vertical(|ui| {
             let width = ui.available_width().max(1.0);
             ui.allocate_ui_with_layout(
-                egui::vec2(width, HELP_BUTTON_EDGE),
+                egui::vec2(width, Metrics::of(ui.ctx()).help_button_edge),
                 Layout::left_to_right(Align::Center),
                 |ui| {
                     ui.label(label).on_hover_text(help);
@@ -86,7 +86,7 @@ pub fn form_row_with_help<R>(
     } else {
         let width = ui.available_width().max(1.0);
         ui.allocate_ui_with_layout(
-            egui::vec2(width, CONTROL_HEIGHT),
+            egui::vec2(width, control_height(ui)),
             Layout::left_to_right(Align::Center),
             |ui| {
                 ui.label(label).on_hover_text(help);

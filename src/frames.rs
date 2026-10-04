@@ -5,8 +5,8 @@ use egui::{
 
 use crate::forms::strong_with_help;
 use crate::metrics::{
-    CARD_RADIUS, CONTENT_MARGIN, CONTROL_HEIGHT, PANEL_TITLE_HEIGHT, PANEL_TITLE_TEXT_SIZE,
-    SPACE_SM, SPACE_XS, TOOLBAR_HEIGHT, TOOLBAR_ICON_EDGE, TOOL_RAIL_ICON_EDGE,
+    control_height, Metrics, CARD_RADIUS, CONTENT_MARGIN, PANEL_TITLE_HEIGHT,
+    PANEL_TITLE_TEXT_SIZE, SPACE_SM, SPACE_XS, TOOLBAR_ICON_EDGE, TOOL_RAIL_ICON_EDGE,
 };
 use crate::responsive::{content_margin, is_compact_portrait};
 
@@ -19,13 +19,16 @@ pub fn tool_rail_icon_size() -> Vec2 {
 }
 
 pub fn prepare_toolbar(ui: &mut Ui) {
-    ui.set_min_height(TOOLBAR_HEIGHT);
-    ui.spacing_mut().interact_size.y = CONTROL_HEIGHT;
+    ui.set_min_height(Metrics::of(ui.ctx()).toolbar_height);
+    ui.spacing_mut().interact_size.y = control_height(ui);
     ui.spacing_mut().item_spacing = egui::vec2(SPACE_SM, SPACE_XS);
 }
 
 pub fn toolbar_row<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) -> InnerResponse<R> {
-    let size = egui::vec2(ui.available_width().max(1.0), TOOLBAR_HEIGHT);
+    let size = egui::vec2(
+        ui.available_width().max(1.0),
+        Metrics::of(ui.ctx()).toolbar_height,
+    );
     ui.allocate_ui_with_layout(size, Layout::left_to_right(Align::Center), |ui| {
         prepare_toolbar(ui);
         add_contents(ui)

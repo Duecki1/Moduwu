@@ -1,6 +1,6 @@
 use egui::{Ui, Vec2};
 
-use crate::metrics::{CARD_GAP, CONTENT_MARGIN, SPACE_SM};
+use crate::metrics::{Metrics, CARD_GAP, CONTENT_MARGIN, SPACE_SM};
 
 const COMPACT_PORTRAIT_CARD_GAP: f32 = SPACE_SM;
 const COMPACT_PORTRAIT_CONTENT_MARGIN: i8 = SPACE_SM as i8;
@@ -98,7 +98,10 @@ pub fn compact_portrait_for_platform(viewport: Vec2, android: bool) -> bool {
 }
 
 pub fn is_compact_portrait(ui: &Ui) -> bool {
-    compact_portrait_for_platform(ui.ctx().content_rect().size(), cfg!(target_os = "android"))
+    compact_portrait_for_platform(
+        ui.ctx().content_rect().size(),
+        Metrics::of(ui.ctx()).touch_layout,
+    )
 }
 
 pub fn content_margin(ui: &Ui) -> i8 {
