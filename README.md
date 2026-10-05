@@ -1,7 +1,8 @@
 # Moduwu Design
 
 A standalone Rust library for egui 0.35, extracted from CalibRaw. It provides
-four theme presets (Obsidian Blue, Obsidian Red, Porcelain, and Daylight),
+six theme presets (Obsidian Blue, Obsidian Red, Porcelain, Daylight, and
+Plain Grey in dark and light),
 custom palette support, spacing and sizing metrics, cards, toolbar rows,
 buttons, form controls, numeric fields, sliders, menus, dialogs, and
 responsive layout helpers.

@@ -8,24 +8,30 @@ pub enum Design {
     #[default]
     ObsidianBlue,
     ObsidianRed,
+    PlainGreyDark,
     Porcelain,
     DaylightBlue,
+    PlainGreyLight,
 }
 
 impl Design {
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 6] = [
         Self::ObsidianBlue,
         Self::ObsidianRed,
+        Self::PlainGreyDark,
         Self::Porcelain,
         Self::DaylightBlue,
+        Self::PlainGreyLight,
     ];
 
     pub const fn label(self) -> &'static str {
         match self {
             Self::ObsidianBlue => "Obsidian Blue · Dark",
             Self::ObsidianRed => "Obsidian Red · Dark",
+            Self::PlainGreyDark => "Plain Grey · Dark",
             Self::Porcelain => "Porcelain · Light",
             Self::DaylightBlue => "Daylight · Light",
+            Self::PlainGreyLight => "Plain Grey · Light",
         }
     }
 
@@ -35,11 +41,17 @@ impl Design {
             Self::ObsidianRed => "Warm near-black surfaces with a restrained ruby accent.",
             Self::Porcelain => "Warm paper-like surfaces with a restrained coral accent.",
             Self::DaylightBlue => "Clean cool surfaces with a focused blue accent.",
+            Self::PlainGreyDark | Self::PlainGreyLight => {
+                "Neutral grey surfaces and accent, with no colour tint."
+            }
         }
     }
 
     pub const fn is_dark(self) -> bool {
-        matches!(self, Self::ObsidianBlue | Self::ObsidianRed)
+        matches!(
+            self,
+            Self::ObsidianBlue | Self::ObsidianRed | Self::PlainGreyDark
+        )
     }
 
     pub const fn palette(self) -> Palette {
@@ -76,6 +88,23 @@ impl Design {
                 open: Color32::from_rgb(44, 36, 39),
                 open_stroke: Color32::from_rgb(88, 61, 67),
             },
+            // Accent text is white in dark themes, so the accent stays mid-dark.
+            Self::PlainGreyDark => Palette {
+                accent: Color32::from_gray(112),
+                accent_bright: Color32::from_gray(160),
+                hyperlink: Color32::from_gray(190),
+                border: Color32::from_gray(52),
+                panel: Color32::from_gray(27),
+                window: Color32::from_gray(20),
+                faint: Color32::from_gray(35),
+                extreme: Color32::from_gray(13),
+                inactive: Color32::from_gray(38),
+                inactive_stroke: Color32::from_gray(64),
+                hovered: Color32::from_gray(48),
+                hovered_stroke: Color32::from_gray(88),
+                open: Color32::from_gray(43),
+                open_stroke: Color32::from_gray(77),
+            },
             Self::Porcelain => Palette {
                 accent: Color32::from_rgb(232, 132, 169),
                 accent_bright: Color32::from_rgb(242, 166, 194),
@@ -108,6 +137,23 @@ impl Design {
                 open: Color32::from_rgb(211, 223, 237),
                 open_stroke: Color32::from_rgb(143, 163, 187),
             },
+            // Accent text is near-black in light themes, so the accent stays mid-light.
+            Self::PlainGreyLight => Palette {
+                accent: Color32::from_gray(170),
+                accent_bright: Color32::from_gray(198),
+                hyperlink: Color32::from_gray(40),
+                border: Color32::from_gray(196),
+                panel: Color32::from_gray(241),
+                window: Color32::from_gray(250),
+                faint: Color32::from_gray(234),
+                extreme: Color32::from_gray(218),
+                inactive: Color32::from_gray(230),
+                inactive_stroke: Color32::from_gray(184),
+                hovered: Color32::from_gray(219),
+                hovered_stroke: Color32::from_gray(160),
+                open: Color32::from_gray(213),
+                open_stroke: Color32::from_gray(152),
+            },
         }
     }
 
@@ -136,6 +182,36 @@ mod tests {
             assert_eq!(style.visuals.panel_fill, palette.panel);
             assert_eq!(style.visuals.window_fill, palette.window);
             assert_eq!(style.visuals.widgets.active.bg_fill, palette.accent);
+        }
+    }
+
+    #[test]
+    fn plain_grey_presets_are_neutral_in_both_modes() {
+        assert!(Design::PlainGreyDark.is_dark());
+        assert!(!Design::PlainGreyLight.is_dark());
+        for design in [Design::PlainGreyDark, Design::PlainGreyLight] {
+            let p = design.palette();
+            for color in [
+                p.accent,
+                p.accent_bright,
+                p.hyperlink,
+                p.border,
+                p.panel,
+                p.window,
+                p.faint,
+                p.extreme,
+                p.inactive,
+                p.inactive_stroke,
+                p.hovered,
+                p.hovered_stroke,
+                p.open,
+                p.open_stroke,
+            ] {
+                assert!(
+                    color.r() == color.g() && color.g() == color.b(),
+                    "{design:?} {color:?}"
+                );
+            }
         }
     }
 }
