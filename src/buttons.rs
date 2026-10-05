@@ -254,6 +254,24 @@ pub fn toggle_button(ui: &mut Ui, label: impl Into<egui::WidgetText>, selected: 
     )
 }
 
+/// An on/off option drawn as a [`toggle_button`]. Clicking flips `value` and
+/// marks the response changed, as `ui.checkbox` does, and assistive
+/// technology sees a checkbox with its checked state.
+pub fn toggle(ui: &mut Ui, value: &mut bool, label: impl Into<egui::WidgetText>) -> Response {
+    let label = label.into();
+    let text = label.text().to_owned();
+    let mut response = toggle_button(ui, label, *value);
+    if response.clicked() {
+        *value = !*value;
+        response.mark_changed();
+    }
+    let (enabled, checked) = (ui.is_enabled(), *value);
+    response.widget_info(|| {
+        egui::WidgetInfo::selected(egui::WidgetType::Checkbox, enabled, checked, &text)
+    });
+    response
+}
+
 pub fn navigation_row(
     ui: &mut Ui,
     label: impl Into<egui::WidgetText>,
@@ -371,6 +389,99 @@ mod tests {
             assert_eq!(response.rect.width(), size.x);
             assert_eq!(response.rect.height(), CONTROL_HEIGHT);
         });
+    }
+
+    fn click_toggle(value: &mut bool, enabled: bool) -> (bool, Option<egui::WidgetInfo>) {
+        let ctx = egui::Context::default();
+        let mut changed = false;
+        let mut info = None;
+        let mut rect = egui::Rect::NOTHING;
+        for events in [
+            vec![],
+            vec![
+                egui::Event::PointerMoved(egui::Pos2::ZERO),
+                egui::Event::PointerButton {
+                    pos: egui::Pos2::ZERO,
+                    button: egui::PointerButton::Primary,
+                    pressed: true,
+                    modifiers: egui::Modifiers::NONE,
+                },
+            ],
+            vec![egui::Event::PointerButton {
+                pos: egui::Pos2::ZERO,
+                button: egui::PointerButton::Primary,
+                pressed: false,
+                modifiers: egui::Modifiers::NONE,
+            }],
+        ] {
+            let events = events
+                .into_iter()
+                .map(|event| match event {
+                    egui::Event::PointerMoved(_) => egui::Event::PointerMoved(rect.center()),
+                    egui::Event::PointerButton {
+                        button,
+                        pressed,
+                        modifiers,
+                        ..
+                    } => egui::Event::PointerButton {
+                        pos: rect.center(),
+                        button,
+                        pressed,
+                        modifiers,
+                    },
+                    other => other,
+                })
+                .collect();
+            let output = ctx.run_ui(
+                egui::RawInput {
+                    events,
+                    ..Default::default()
+                },
+                |ui| {
+                    ui.add_enabled_ui(enabled, |ui| {
+                        let response = toggle(ui, value, "Option");
+                        rect = response.rect;
+                        changed |= response.changed();
+                    });
+                },
+            );
+            info = output
+                .platform_output
+                .events
+                .iter()
+                .rev()
+                .find_map(|event| match event {
+                    egui::output::OutputEvent::ValueChanged(info)
+                    | egui::output::OutputEvent::Clicked(info) => Some(info.clone()),
+                    _ => None,
+                })
+                .or(info);
+        }
+        (changed, info)
+    }
+
+    #[test]
+    fn toggles_flip_on_click_and_report_a_checkbox_state() {
+        let mut value = false;
+        let (changed, info) = click_toggle(&mut value, true);
+        assert!(value);
+        assert!(changed);
+        let info = info.expect("toggle reports its click");
+        assert_eq!(info.typ, egui::WidgetType::Checkbox);
+        assert_eq!(info.selected, Some(true));
+        assert_eq!(info.label.as_deref(), Some("Option"));
+
+        let (changed, _) = click_toggle(&mut value, true);
+        assert!(!value);
+        assert!(changed);
+    }
+
+    #[test]
+    fn disabled_toggles_ignore_clicks() {
+        let mut value = false;
+        let (changed, _) = click_toggle(&mut value, false);
+        assert!(!value);
+        assert!(!changed);
     }
 
     #[test]

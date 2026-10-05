@@ -10,8 +10,8 @@ use moduwu_design::{
     dialog_window, dropdown_menu, form_combo, form_row, form_row_with_help, full_width_button,
     icon_button, icon_toggle_button, menu_item, navigation_row, panel_title, primary_button,
     secondary_button, section_card, section_card_with_help, segmented_button, singleline_text_edit,
-    tab_button, toggle_button, toolbar_button, toolbar_row, Design, DialogAction, DialogKeyboard,
-    Metrics, NumberField, Slider, SliderLayout, DIALOG_WIDTH_FORM,
+    tab_button, toggle_button, toggle_with_help, toolbar_button, toolbar_row, AngleDial, Design,
+    DialogAction, DialogKeyboard, Metrics, NumberField, Slider, SliderLayout, DIALOG_WIDTH_FORM,
 };
 
 fn main() -> eframe::Result {
@@ -54,6 +54,7 @@ struct Gallery {
     exposure: f32,
     hue: f32,
     opacity: f32,
+    angle: f32,
     choice: usize,
     dialog_open: bool,
 }
@@ -75,6 +76,7 @@ impl Default for Gallery {
             exposure: 0.35,
             hue: 210.0,
             opacity: 80.0,
+            angle: -30.0,
             choice: 0,
             dialog_open: false,
         }
@@ -164,6 +166,7 @@ impl Gallery {
             "Rows stack below the compact breakpoint.",
             |ui| {
                 checkbox_with_help(ui, &mut self.checked, "Checkbox", "A checkbox with help.");
+                toggle_with_help(ui, &mut self.checked, "Toggle", "A toggle with help.");
                 form_combo(
                     ui,
                     "Choice",
@@ -222,6 +225,9 @@ impl Gallery {
             Slider::new("Hue", &mut self.hue, 0.0..=360.0)
                 .gradient(|t| egui::ecolor::Hsva::new(t, 0.9, 0.92, 1.0).into())
                 .layout(layout)
+                .show(ui);
+            AngleDial::new("Angle", &mut self.angle)
+                .hover_text("Drag the dial; Shift snaps to 15°.")
                 .show(ui);
         });
 

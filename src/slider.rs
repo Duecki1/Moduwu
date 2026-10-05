@@ -401,7 +401,7 @@ fn compact_label(
 
 /// An editable [`NumberField`], or a read-only readout on touch screens where
 /// a keyboard would cover the slider.
-fn value_field<Num: Numeric + Copy>(
+pub(crate) fn value_field<Num: Numeric + Copy>(
     ui: &mut Ui,
     value: &mut Num,
     range: RangeInclusive<Num>,
@@ -734,7 +734,7 @@ fn paint_gradient_track(
 }
 
 /// Rounds `raw` to `decimals` places and stores it; returns whether it changed.
-fn set_numeric<Num: Numeric + Copy>(value: &mut Num, raw: f64, decimals: usize) -> bool {
+pub(crate) fn set_numeric<Num: Numeric + Copy>(value: &mut Num, raw: f64, decimals: usize) -> bool {
     let scale = 10_f64.powi(decimals.min(12) as i32);
     let next = Num::from_f64((raw * scale).round() / scale);
     if next == *value {

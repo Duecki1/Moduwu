@@ -6,6 +6,7 @@
 //! expected to keep their own theme selection, persistence, domain widgets,
 //! and business logic outside this crate.
 
+mod angle_dial;
 mod buttons;
 mod dialogs;
 mod forms;
@@ -18,13 +19,14 @@ mod responsive;
 mod slider;
 mod theme;
 
+pub use angle_dial::{AngleDial, SNAP_DEGREES};
 pub use buttons::{
     action_row, destructive_button, floating_action_button, floating_action_rect,
     full_width_button, icon_button, icon_button_enabled, icon_toggle_button,
     icon_toggle_button_enabled, interaction_visual_state, interaction_visuals,
     interaction_visuals_for_flags, navigation_row, primary_action_button, primary_button,
-    secondary_button, secondary_button_enabled, segmented_button, tab_button, toggle_button,
-    toolbar_button, InteractionVisualState, InteractionVisuals, PrimaryButton,
+    secondary_button, secondary_button_enabled, segmented_button, tab_button, toggle,
+    toggle_button, toolbar_button, InteractionVisualState, InteractionVisuals, PrimaryButton,
 };
 pub use dialogs::{
     dialog_button_row, dialog_confirmation_buttons, dialog_keyboard_action, dialog_text_field,
@@ -35,6 +37,7 @@ pub use dialogs::{
 pub use forms::{
     checkbox_with_help, combo_box, form_combo, form_combo_with_help, form_row, form_row_with_help,
     heading_with_help, property_row, responsive_combo_box, singleline_text_edit, strong_with_help,
+    toggle_with_help,
 };
 pub use frames::{
     card_frame, card_header, content_card, panel_frame, panel_title, prepare_toolbar,

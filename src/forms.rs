@@ -26,6 +26,22 @@ pub fn checkbox_with_help(
     .inner
 }
 
+/// [`checkbox_with_help`] drawn as a [`crate::toggle`] button.
+pub fn toggle_with_help(
+    ui: &mut Ui,
+    checked: &mut bool,
+    label: impl Into<egui::WidgetText>,
+    help: &str,
+) -> Response {
+    let width = ui.available_width().max(1.0);
+    ui.allocate_ui_with_layout(
+        egui::vec2(width, control_height(ui)),
+        Layout::left_to_right(Align::Center),
+        |ui| crate::buttons::toggle(ui, checked, label).on_hover_text(help),
+    )
+    .inner
+}
+
 pub fn property_row<R>(
     ui: &mut Ui,
     label: impl Into<egui::WidgetText>,
