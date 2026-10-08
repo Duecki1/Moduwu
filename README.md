@@ -18,6 +18,12 @@ metrics can be switched at runtime, and the "Enabled" toggle shows disabled
 states; Tab moves keyboard focus. `cargo test` renders it headlessly in every
 combination.
 
+## Changes in 2.1
+
+- `request_scroll_into_view` and `scroll_into_view_on_draw`: an action asks for
+  a widget that may first be drawn a frame later, and the enclosing scroll
+  areas bring it into view once it is. A request lapses after a few passes.
+
 ## Changes in 2.0
 
 - `NumberField`: a drag-value field with focus-aware arrow stepping and repeat,

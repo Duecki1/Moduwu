@@ -2,7 +2,8 @@
 //!
 //! The crate intentionally owns only presentation concerns: palette-driven
 //! theme application, layout metrics, frames/cards, common buttons and form
-//! controls, popup helpers, and responsive layout utilities. Applications are
+//! controls, popup helpers, and responsive layout utilities, including
+//! scrolling a newly revealed widget into view. Applications are
 //! expected to keep their own theme selection, persistence, domain widgets,
 //! and business logic outside this crate.
 
@@ -16,6 +17,7 @@ mod metrics;
 mod number_field;
 mod presets;
 mod responsive;
+mod scroll_into_view;
 mod slider;
 mod theme;
 
@@ -61,6 +63,7 @@ pub use responsive::{
     card_gap, compact_portrait_for_platform, content_margin, is_compact_portrait,
     persisted_panel_width, ResponsiveWidth, ScreenLayout,
 };
+pub use scroll_into_view::{request_scroll_into_view, scroll_into_view_on_draw};
 pub use slider::{
     lock_slider_scroll, slider_scroll_locked, Slider, SliderLayout, SliderMetrics, SliderResponse,
 };
