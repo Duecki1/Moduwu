@@ -20,6 +20,7 @@ mod responsive;
 mod scroll_into_view;
 mod slider;
 mod theme;
+mod tooltip;
 
 pub use angle_dial::{AngleDial, SNAP_DEGREES};
 pub use buttons::{
@@ -68,3 +69,4 @@ pub use slider::{
     lock_slider_scroll, slider_scroll_locked, Slider, SliderLayout, SliderMetrics, SliderResponse,
 };
 pub use theme::{Palette, Theme, ThemeMode};
+pub use tooltip::still_hover_text;

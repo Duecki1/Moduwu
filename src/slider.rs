@@ -4,7 +4,8 @@
 //! do not steal scrolling, and claims the pointer once a drag is clearly
 //! horizontal. Scroll areas ask [`slider_scroll_locked`] whether a slider owns
 //! the current drag. Double-clicking the label, track or value resets to
-//! [`Slider::reset_to`], zero by default.
+//! [`Slider::reset_to`], zero by default. Only the label has a tooltip, shown
+//! once the pointer rests on it, so adjusting values never raises one.
 
 use std::ops::RangeInclusive;
 
@@ -14,6 +15,7 @@ use crate::buttons::interaction_visuals_for_flags;
 use crate::metrics::Metrics;
 use crate::number_field::NumberField;
 use crate::responsive::is_compact_portrait;
+use crate::tooltip::still_hover_text;
 
 const TRACK_DRAG_THRESHOLD: f32 = 8.0;
 const HANDLE_DRAG_THRESHOLD: f32 = 2.0;
@@ -143,6 +145,8 @@ impl<'a, Num: Numeric + Copy> Slider<'a, Num> {
         self
     }
 
+    /// Help shown on the label, followed by the reset hint. A track rendered
+    /// with [`Self::show_track`] has no label and shows no tooltip.
     pub fn hover_text(mut self, hover_text: impl Into<Option<&'a str>>) -> Self {
         self.hover_text = hover_text.into();
         self
@@ -268,8 +272,10 @@ fn compact_row<Num: Numeric + Copy>(
         |ui| {
             ui.spacing_mut().item_spacing.x = COMPACT_ROW_GAP;
             let label_tooltip = format!("{}\n{}", track.label, track.reset_tooltip());
-            let label_response = compact_label(ui, track.label, track.accent, label_width, metrics)
-                .on_hover_text(label_tooltip);
+            let label_response = still_hover_text(
+                compact_label(ui, track.label, track.accent, label_width, metrics),
+                label_tooltip,
+            );
             if label_response.double_clicked() {
                 changed |= track.reset(value);
             }
@@ -279,10 +285,7 @@ fn compact_row<Num: Numeric + Copy>(
             let (value_response, value_changed) =
                 value_field(ui, value, range, track.decimals, track.step, metrics);
             changed |= value_changed;
-            if value_response
-                .on_hover_text(track.reset_tooltip())
-                .double_clicked()
-            {
+            if value_response.double_clicked() {
                 changed |= track.reset(value);
             }
         },
@@ -316,10 +319,7 @@ fn stacked_rows<Num: Numeric + Copy>(
             } else {
                 ui.add(egui::Label::new(track.label).sense(Sense::click()))
             };
-            if label_response
-                .on_hover_text(track.reset_tooltip())
-                .double_clicked()
-            {
+            if still_hover_text(label_response, track.reset_tooltip()).double_clicked() {
                 changed |= track.reset(value);
             }
 
@@ -333,10 +333,7 @@ fn stacked_rows<Num: Numeric + Copy>(
                     metrics,
                 );
                 changed |= value_changed;
-                if value_response
-                    .on_hover_text(track.reset_tooltip())
-                    .double_clicked()
-                {
+                if value_response.double_clicked() {
                     changed |= track.reset(value);
                 }
             });
@@ -682,8 +679,7 @@ fn track_widget<Num: Numeric + Copy>(
 
     track_response
         .union(handle_response)
-        .on_hover_cursor(egui::CursorIcon::ResizeHorizontal)
-        .on_hover_text(options.reset_tooltip());
+        .on_hover_cursor(egui::CursorIcon::ResizeHorizontal);
 
     SliderResponse {
         changed,
@@ -932,6 +928,58 @@ mod tests {
                     time += 1.0;
                 }
             }
+        }
+    }
+
+    impl Harness {
+        fn tooltip_open(&self) -> bool {
+            self.ctx.memory(|memory| {
+                memory
+                    .areas()
+                    .visible_layer_ids()
+                    .iter()
+                    .any(|layer| layer.order == egui::Order::Tooltip)
+            })
+        }
+
+        /// Rests the pointer at `pos` for `seconds`, one frame per 50 ms.
+        fn rest(&mut self, pos: egui::Pos2, seconds: f64) {
+            self.frame(vec![Event::PointerMoved(pos)]);
+            for _ in 0..(seconds / 0.05) as usize {
+                self.frame(Vec::new());
+            }
+        }
+    }
+
+    #[test]
+    fn label_tooltip_waits_for_the_pointer_to_rest() {
+        let label = pos2(20.0, METRICS.header_height * 0.5);
+        let mut harness = Harness::new();
+        harness.rest(label, 0.2);
+        assert!(!harness.tooltip_open());
+        harness.rest(label, 1.0);
+        assert!(harness.tooltip_open());
+
+        // A tooltip shown moments ago does not let the next one skip the wait.
+        harness.frame(vec![Event::PointerMoved(pos2(24.0, label.y))]);
+        harness.frame(vec![Event::PointerMoved(pos2(20.0, TRACK_Y))]);
+        harness.frame(vec![Event::PointerMoved(pos2(
+            20.0,
+            METRICS.header_height + 60.0,
+        ))]);
+        harness.frame(vec![Event::PointerMoved(label)]);
+        assert!(!harness.tooltip_open());
+    }
+
+    #[test]
+    fn track_and_value_field_never_show_a_tooltip() {
+        for pos in [
+            pos2(200.0, TRACK_Y),
+            pos2(390.0, METRICS.header_height * 0.5),
+        ] {
+            let mut harness = Harness::new();
+            harness.rest(pos, 1.0);
+            assert!(!harness.tooltip_open(), "tooltip at {pos:?}");
         }
     }
 
