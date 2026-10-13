@@ -11,7 +11,8 @@ use moduwu_design::{
     icon_button, icon_toggle_button, menu_item, navigation_row, panel_title, primary_button,
     secondary_button, section_card, section_card_with_help, segmented_button, singleline_text_edit,
     tab_button, toggle_button, toggle_with_help, toolbar_button, toolbar_row, AngleDial, Design,
-    DialogAction, DialogKeyboard, Metrics, NumberField, Slider, SliderLayout, DIALOG_WIDTH_FORM,
+    DialogAction, DialogKeyboard, DialogPreview, Metrics, NumberField, Slider, SliderLayout,
+    DIALOG_WIDTH_FORM, DIALOG_WIDTH_PREVIEW,
 };
 
 fn main() -> eframe::Result {
@@ -57,6 +58,7 @@ struct Gallery {
     angle: f32,
     choice: usize,
     dialog_open: bool,
+    preview_dialog_open: bool,
 }
 
 impl Default for Gallery {
@@ -79,6 +81,7 @@ impl Default for Gallery {
             angle: -30.0,
             choice: 0,
             dialog_open: false,
+            preview_dialog_open: false,
         }
     }
 }
@@ -107,6 +110,7 @@ impl Gallery {
             });
         });
         self.dialog(ui.ctx());
+        self.preview_dialog(ui.ctx());
     }
 
     fn settings(&mut self, ui: &mut Ui) {
@@ -242,6 +246,9 @@ impl Gallery {
                 if secondary_button(ui, "Dialog").clicked() {
                     self.dialog_open = true;
                 }
+                if secondary_button(ui, "Preview dialog").clicked() {
+                    self.preview_dialog_open = true;
+                }
             });
             for (index, label) in ["Library", "Develop"].into_iter().enumerate() {
                 if navigation_row(ui, label, self.tab == index, egui::Sense::click()).clicked() {
@@ -269,6 +276,48 @@ impl Gallery {
                 self.dialog_open = false;
             }
         });
+    }
+
+    /// The preview stays in view beside or above the controls, which scroll.
+    fn preview_dialog(&mut self, ctx: &egui::Context) {
+        if !self.preview_dialog_open {
+            return;
+        }
+        let mut action = DialogAction::None;
+        let level = (self.exposure.clamp(-1.0, 1.0) * 0.5 + 0.5) * 255.0;
+        dialog_window("Preview dialog", ctx, DIALOG_WIDTH_PREVIEW).show_with_preview(
+            ctx,
+            DialogPreview {
+                label: "Exposure preview",
+                aspect: 2.0 / 3.0,
+            },
+            |ui, rect| {
+                let grey = level.round() as u8;
+                ui.painter_at(rect)
+                    .rect_filled(rect, 0.0, Color32::from_gray(grey));
+            },
+            |ui| {
+                Slider::new("Exposure", &mut self.exposure, -1.0..=1.0)
+                    .decimals(2)
+                    .show(ui);
+                for row in 1..=12 {
+                    ui.label(format!("Scrolling content {row}"));
+                }
+            },
+            |ui| {
+                action = dialog_confirmation_buttons(
+                    ui,
+                    "Cancel",
+                    "Apply",
+                    true,
+                    false,
+                    DialogKeyboard::CLOSE_ONLY,
+                );
+            },
+        );
+        if action != DialogAction::None {
+            self.preview_dialog_open = false;
+        }
     }
 }
 
@@ -307,6 +356,7 @@ mod tests {
                         enabled,
                         compact_sliders,
                         dialog_open: true,
+                        preview_dialog_open: true,
                         ..Gallery::default()
                     };
                     frame(&ctx, &mut gallery, Vec::new());

@@ -9,8 +9,11 @@ pub const DIALOG_WIDTH_FORM: f32 = 420.0;
 pub const DIALOG_WIDTH_DEFAULT: f32 = 440.0;
 pub const DIALOG_WIDTH_WIDE: f32 = 480.0;
 pub const DIALOG_WIDTH_LARGE: f32 = 520.0;
+/// For [`DialogWindow::show_with_preview`]: wide enough for an image beside
+/// its controls on landscape screens.
+pub const DIALOG_WIDTH_PREVIEW: f32 = 960.0;
 pub const DIALOG_TEXT_FIELD_WIDTH: f32 = 320.0;
-const DIALOG_VIEWPORT_PADDING: f32 = 24.0;
+pub(crate) const DIALOG_VIEWPORT_PADDING: f32 = 24.0;
 pub const DIALOG_MARGIN: i8 = WINDOW_MARGIN;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -167,9 +170,11 @@ pub fn dialog_text_field(
 }
 
 pub struct DialogWindow {
-    window: egui::Window<'static>,
-    title: String,
-    max_body_height: f32,
+    pub(crate) window: egui::Window<'static>,
+    pub(crate) title: String,
+    /// The window's height limit, frame included.
+    pub(crate) max_height: f32,
+    pub(crate) max_body_height: f32,
 }
 
 impl DialogWindow {
@@ -197,6 +202,7 @@ impl DialogWindow {
             window,
             title,
             max_body_height,
+            ..
         } = self;
         window.show(ctx, |ui| {
             ui.heading(title);
@@ -219,13 +225,9 @@ impl DialogWindow {
             window,
             title,
             max_body_height,
+            ..
         } = self;
-        // Two consent actions wrap into separate rows on narrow screens.
-        let footer_reserve = if ctx.content_rect().width() < 320.0 {
-            Metrics::of(ctx).control_height * 2.0 + 32.0
-        } else {
-            Metrics::of(ctx).control_height + 16.0
-        };
+        let footer_reserve = footer_reserve(ctx);
         window.show(ctx, |ui| {
             ui.heading(title);
             ui.add_space(SPACE_SM);
@@ -237,6 +239,16 @@ impl DialogWindow {
             add_footer(ui);
             body
         })
+    }
+}
+
+/// The height kept below a dialog's scrolling body for its action row.
+pub(crate) fn footer_reserve(ctx: &egui::Context) -> f32 {
+    // Two consent actions wrap into separate rows on narrow screens.
+    if ctx.content_rect().width() < 320.0 {
+        Metrics::of(ctx).control_height * 2.0 + 32.0
+    } else {
+        Metrics::of(ctx).control_height + 16.0
     }
 }
 
@@ -275,6 +287,7 @@ pub fn dialog_window(
     DialogWindow {
         window,
         title,
+        max_height: available.y,
         max_body_height: (available.y - f32::from(DIALOG_MARGIN) * 2.0 - 48.0).max(32.0),
     }
 }

@@ -2,7 +2,8 @@
 //!
 //! The crate intentionally owns only presentation concerns: palette-driven
 //! theme application, layout metrics, frames/cards, common buttons and form
-//! controls, popup helpers, and responsive layout utilities, including
+//! controls, popup helpers, dialogs (including one that pairs an image
+//! preview with its controls), and responsive layout utilities, including
 //! scrolling a newly revealed widget into view. Applications are
 //! expected to keep their own theme selection, persistence, domain widgets,
 //! and business logic outside this crate.
@@ -16,6 +17,7 @@ mod menus;
 mod metrics;
 mod number_field;
 mod presets;
+mod preview_dialog;
 mod responsive;
 mod scroll_into_view;
 mod slider;
@@ -35,7 +37,7 @@ pub use dialogs::{
     dialog_button_row, dialog_confirmation_buttons, dialog_keyboard_action, dialog_text_field,
     dialog_window, request_initial_focus, DialogAction, DialogKeyboard, DialogWindow,
     DIALOG_MARGIN, DIALOG_TEXT_FIELD_WIDTH, DIALOG_WIDTH_DEFAULT, DIALOG_WIDTH_FORM,
-    DIALOG_WIDTH_LARGE, DIALOG_WIDTH_NARROW, DIALOG_WIDTH_WIDE,
+    DIALOG_WIDTH_LARGE, DIALOG_WIDTH_NARROW, DIALOG_WIDTH_PREVIEW, DIALOG_WIDTH_WIDE,
 };
 pub use forms::{
     checkbox_with_help, combo_box, form_combo, form_combo_with_help, form_row, form_row_with_help,
@@ -60,6 +62,7 @@ pub use metrics::{
 };
 pub use number_field::{arrow_step, step_focused, NumberField};
 pub use presets::Design;
+pub use preview_dialog::DialogPreview;
 pub use responsive::{
     card_gap, compact_portrait_for_platform, content_margin, is_compact_portrait,
     persisted_panel_width, ResponsiveWidth, ScreenLayout,

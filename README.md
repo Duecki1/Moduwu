@@ -18,6 +18,13 @@ metrics can be switched at runtime, and the "Enabled" toggle shows disabled
 states; Tab moves keyboard focus. `cargo test` renders it headlessly in every
 combination.
 
+## Changes in 2.2
+
+- `DialogWindow::show_with_preview` (with `DialogPreview` and
+  `DIALOG_WIDTH_PREVIEW`): a dialog that pairs an image preview with its
+  controls, side by side on landscape screens and stacked on portrait ones. The
+  preview always stays in view; only the controls scroll, above the action row.
+
 ## Changes in 2.1
 
 - `request_scroll_into_view` and `scroll_into_view_on_draw`: an action asks for
