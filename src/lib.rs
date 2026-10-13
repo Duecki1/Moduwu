@@ -3,12 +3,13 @@
 //! The crate intentionally owns only presentation concerns: palette-driven
 //! theme application, layout metrics, frames/cards, common buttons and form
 //! controls, popup helpers, dialogs (including one that pairs an image
-//! preview with its controls), and responsive layout utilities, including
-//! scrolling a newly revealed widget into view. Applications are
-//! expected to keep their own theme selection, persistence, domain widgets,
-//! and business logic outside this crate.
+//! preview with its controls), short animated clips, and responsive layout
+//! utilities, including scrolling a newly revealed widget into view.
+//! Applications are expected to keep their own theme selection, persistence,
+//! domain widgets, and business logic outside this crate.
 
 mod angle_dial;
+mod animated_image;
 mod buttons;
 mod dialogs;
 mod forms;
@@ -25,6 +26,7 @@ mod theme;
 mod tooltip;
 
 pub use angle_dial::{AngleDial, SNAP_DEGREES};
+pub use animated_image::{AnimatedImage, AnimatedImageError};
 pub use buttons::{
     action_row, destructive_button, floating_action_button, floating_action_rect,
     full_width_button, icon_button, icon_button_enabled, icon_toggle_button,

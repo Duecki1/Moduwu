@@ -4,8 +4,8 @@ A standalone Rust library for egui 0.35, extracted from CalibRaw. It provides
 six theme presets (Obsidian Blue, Obsidian Red, Porcelain, Daylight, and
 Plain Grey in dark and light),
 custom palette support, spacing and sizing metrics, cards, toolbar rows,
-buttons, form controls, numeric fields, sliders, menus, dialogs, and
-responsive layout helpers.
+buttons, form controls, numeric fields, sliders, menus, dialogs, animated
+clips, and responsive layout helpers.
 
 ## Gallery
 
@@ -17,6 +17,13 @@ The gallery shows every reusable control in each theme. Desktop and Android
 metrics can be switched at runtime, and the "Enabled" toggle shows disabled
 states; Tab moves keyboard focus. `cargo test` renders it headlessly in every
 combination.
+
+## Changes in 2.3
+
+- `AnimatedImage`: a short looping clip, such as a bundled help clip, decoded
+  once from GIF or WebP bytes (animated or still) and painted into a rect, for
+  example a preview dialog's preview. It plays on show, and a click, Space or
+  Enter pauses and resumes it. Adds the `image` crate (GIF and WebP only).
 
 ## Changes in 2.2
 

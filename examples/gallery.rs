@@ -10,9 +10,9 @@ use moduwu_design::{
     dialog_window, dropdown_menu, form_combo, form_row, form_row_with_help, full_width_button,
     icon_button, icon_toggle_button, menu_item, navigation_row, panel_title, primary_button,
     secondary_button, section_card, section_card_with_help, segmented_button, singleline_text_edit,
-    tab_button, toggle_button, toggle_with_help, toolbar_button, toolbar_row, AngleDial, Design,
-    DialogAction, DialogKeyboard, DialogPreview, Metrics, NumberField, Slider, SliderLayout,
-    DIALOG_WIDTH_FORM, DIALOG_WIDTH_PREVIEW,
+    tab_button, toggle_button, toggle_with_help, toolbar_button, toolbar_row, AngleDial,
+    AnimatedImage, Design, DialogAction, DialogKeyboard, DialogPreview, Metrics, NumberField,
+    Slider, SliderLayout, DIALOG_WIDTH_FORM, DIALOG_WIDTH_PREVIEW,
 };
 
 fn main() -> eframe::Result {
@@ -59,6 +59,8 @@ struct Gallery {
     choice: usize,
     dialog_open: bool,
     preview_dialog_open: bool,
+    /// A clip for the preview dialog, decoded on first use.
+    clip: Option<AnimatedImage>,
 }
 
 impl Default for Gallery {
@@ -82,6 +84,7 @@ impl Default for Gallery {
             choice: 0,
             dialog_open: false,
             preview_dialog_open: false,
+            clip: None,
         }
     }
 }
@@ -279,22 +282,24 @@ impl Gallery {
     }
 
     /// The preview stays in view beside or above the controls, which scroll.
+    /// It plays a clip, as a help dialog would.
     fn preview_dialog(&mut self, ctx: &egui::Context) {
         if !self.preview_dialog_open {
             return;
         }
+        let clip = self.clip.get_or_insert_with(|| {
+            AnimatedImage::from_bytes(ctx, "gallery-clip", &gallery_clip())
+                .expect("the generated clip is a valid GIF")
+        });
         let mut action = DialogAction::None;
-        let level = (self.exposure.clamp(-1.0, 1.0) * 0.5 + 0.5) * 255.0;
         dialog_window("Preview dialog", ctx, DIALOG_WIDTH_PREVIEW).show_with_preview(
             ctx,
             DialogPreview {
-                label: "Exposure preview",
-                aspect: 2.0 / 3.0,
+                label: "Help clip",
+                aspect: clip.aspect(),
             },
             |ui, rect| {
-                let grey = level.round() as u8;
-                ui.painter_at(rect)
-                    .rect_filled(rect, 0.0, Color32::from_gray(grey));
+                clip.show(ui, rect, "Help clip");
             },
             |ui| {
                 Slider::new("Exposure", &mut self.exposure, -1.0..=1.0)
@@ -319,6 +324,34 @@ impl Gallery {
             self.preview_dialog_open = false;
         }
     }
+}
+
+/// A 1.5 s GIF of a bar sweeping across a 3:2 frame.
+fn gallery_clip() -> Vec<u8> {
+    const FRAMES: u32 = 12;
+    let (width, height) = (96, 64);
+    let mut bytes = Vec::new();
+    let mut encoder = image::codecs::gif::GifEncoder::new(&mut bytes);
+    for frame in 0..FRAMES {
+        let bar = frame * width / FRAMES;
+        let pixels = image::RgbaImage::from_fn(width, height, |x, _| {
+            if (bar..bar + width / FRAMES).contains(&x) {
+                image::Rgba([240, 240, 240, 255])
+            } else {
+                image::Rgba([40, 60, 90, 255])
+            }
+        });
+        encoder
+            .encode_frame(image::Frame::from_parts(
+                pixels,
+                0,
+                0,
+                image::Delay::from_numer_denom_ms(125, 1),
+            ))
+            .expect("encoding to memory cannot fail");
+    }
+    drop(encoder);
+    bytes
 }
 
 #[cfg(test)]
