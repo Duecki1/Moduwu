@@ -12,9 +12,9 @@ use moduwu_design::{
     ghost_icon_toggle_button, icon_button, icon_toggle_button, menu_checkbox_item, menu_item,
     navigation_row, panel_title, primary_button, secondary_button, section_card,
     section_card_with_help, segmented_button, segmented_control, singleline_text_edit, tab_button,
-    toggle, toggle_button, toggle_with_help, toolbar_button, toolbar_row, AngleDial, AnimatedImage,
-    Design, Dialog, DialogAction, DialogKeyboard, DialogPreview, DialogSize, Metrics, NumberField,
-    Slider, SliderLayout, DIALOG_WIDTH_FORM, DIALOG_WIDTH_PREVIEW,
+    toggle, toggle_button, toggle_row, toggle_with_help, toolbar_button, toolbar_row, AngleDial,
+    AnimatedImage, Design, Dialog, DialogAction, DialogKeyboard, DialogPreview, DialogSize,
+    Metrics, NumberField, Slider, SliderLayout, DIALOG_WIDTH_FORM, DIALOG_WIDTH_PREVIEW,
 };
 
 fn main() -> eframe::Result {
@@ -202,6 +202,7 @@ impl Gallery {
             |ui| {
                 checkbox_with_help(ui, &mut self.checked, "Checkbox", "A checkbox with help.");
                 toggle_with_help(ui, &mut self.checked, "Toggle", "A toggle with help.");
+                toggle_row(ui, &mut self.toggled, "Toggle row");
                 form_combo(
                     ui,
                     "Choice",

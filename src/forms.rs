@@ -26,15 +26,14 @@ pub fn checkbox_with_help(
     .inner
 }
 
-/// A [`crate::toggle`] spanning the available width, with the switch at the
-/// end of the row and `help` as its tooltip.
+/// A [`crate::toggle_row`] with `help` as its tooltip.
 pub fn toggle_with_help(
     ui: &mut Ui,
     checked: &mut bool,
     label: impl Into<egui::WidgetText>,
     help: &str,
 ) -> Response {
-    crate::switch::full_width_toggle(ui, checked, label).on_hover_text(help)
+    crate::switch::toggle_row(ui, checked, label).on_hover_text(help)
 }
 
 pub fn property_row<R>(

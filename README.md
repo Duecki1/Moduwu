@@ -18,6 +18,12 @@ metrics can be switched at runtime, and the "Enabled" toggle shows disabled
 states; Tab moves keyboard focus. `cargo test` renders it headlessly in every
 combination.
 
+## Changes in 3.2
+
+- `toggle_row`: a switch on its own full-width line, like `toggle_with_help`
+  without the tooltip.
+- A focused switch draws the same focus ring as a segmented control.
+
 ## Changes in 3.1
 
 - `Dialog::show_with_preview` and `DialogSize::Preview`: the modal dialog

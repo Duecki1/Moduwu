@@ -19,18 +19,16 @@ const KNOB_INSET: f32 = 3.0;
 /// changed, as `ui.checkbox` does; assistive technology sees a checkbox with
 /// its checked state.
 ///
-/// The row is as wide as its label and switch. [`crate::toggle_with_help`]
-/// fills the row and puts the switch at its end.
+/// The row is as wide as its label and switch, for rows of several options.
+/// [`toggle_row`] fills the width instead.
 pub fn toggle(ui: &mut Ui, value: &mut bool, label: impl Into<egui::WidgetText>) -> Response {
     switch_row(ui, value, label.into(), false)
 }
 
-/// A [`toggle`] spanning the available width, with the switch at the end.
-pub(crate) fn full_width_toggle(
-    ui: &mut Ui,
-    value: &mut bool,
-    label: impl Into<egui::WidgetText>,
-) -> Response {
+/// A [`toggle`] spanning the available width, with the switch at the end of
+/// the row: the layout for an option on its own line in a card or form.
+/// [`crate::toggle_with_help`] adds a tooltip.
+pub fn toggle_row(ui: &mut Ui, value: &mut bool, label: impl Into<egui::WidgetText>) -> Response {
     switch_row(ui, value, label.into(), true)
 }
 
@@ -101,9 +99,10 @@ fn switch_row(ui: &mut Ui, value: &mut bool, label: egui::WidgetText, fill: bool
         on,
     );
     let knob = lerp_color(idle.fg_stroke.color, Color32::WHITE, on);
+    // The same focus ring as a segmented control's segments.
     let focus = response
         .has_focus()
-        .then(|| Stroke::new(1.5, visuals.selection.bg_fill));
+        .then(|| Stroke::new(1.5, visuals.widgets.active.bg_stroke.color));
 
     let painter = ui.painter();
     painter.galley(text_pos, galley, text_color);
@@ -194,12 +193,12 @@ mod tests {
     }
 
     #[test]
-    fn toggle_hugs_its_label_and_full_width_toggle_fills_the_row() {
+    fn toggle_hugs_its_label_and_toggle_row_fills_the_row() {
         egui::__run_test_ui(|ui| {
             ui.set_width(300.0);
             let mut value = true;
             let compact = toggle(ui, &mut value, "Option").rect;
-            let full = full_width_toggle(ui, &mut value, "Option").rect;
+            let full = toggle_row(ui, &mut value, "Option").rect;
             assert_eq!(compact.height(), CONTROL_HEIGHT);
             assert!(compact.width() < 150.0, "compact {compact:?}");
             assert_eq!(full.width(), 300.0);
@@ -213,7 +212,7 @@ mod tests {
             ui.set_width(120.0);
             let mut value = false;
             let label = "A very long option label that cannot fit beside the switch";
-            let response = full_width_toggle(ui, &mut value, label);
+            let response = toggle_row(ui, &mut value, label);
             assert_eq!(response.rect.width(), 120.0);
         });
     }
