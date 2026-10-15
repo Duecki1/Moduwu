@@ -162,12 +162,7 @@ pub fn toolbar_button(ui: &mut Ui, label: impl Into<egui::WidgetText>, width: f3
 
 /// Square or rectangular glyph button that preserves the themed minimum control height.
 pub fn icon_button(ui: &mut Ui, glyph: &str, size: Vec2, tooltip: &str) -> Response {
-    let button_size = egui::vec2(size.x, size.y.max(ui.spacing().interact_size.y));
-    ui.add_sized(
-        button_size,
-        egui::Button::new(RichText::new(glyph).size(size.y * 0.55)).frame(true),
-    )
-    .on_hover_text(tooltip)
+    add_glyph_button(ui, glyph_button(glyph, size).frame(true), size, tooltip)
 }
 
 /// Toggle variant of [`icon_button`].
@@ -178,12 +173,52 @@ pub fn icon_toggle_button(
     size: Vec2,
     tooltip: &str,
 ) -> Response {
-    let button_size = egui::vec2(size.x, size.y.max(ui.spacing().interact_size.y));
-    ui.add_sized(
-        button_size,
-        egui::Button::new(RichText::new(glyph).size(size.y * 0.55)).selected(selected),
+    add_glyph_button(
+        ui,
+        glyph_button(glyph, size).selected(selected),
+        size,
+        tooltip,
     )
-    .on_hover_text(tooltip)
+}
+
+/// A frameless [`icon_button`] for secondary actions in dense rows, such as
+/// card headers and toolbars: its frame appears only on hover, press and
+/// focus. Keep framed buttons for the actions a row is about.
+pub fn ghost_icon_button(ui: &mut Ui, glyph: &str, size: Vec2, tooltip: &str) -> Response {
+    add_glyph_button(
+        ui,
+        glyph_button(glyph, size).frame_when_inactive(false),
+        size,
+        tooltip,
+    )
+}
+
+/// Toggle variant of [`ghost_icon_button`]: framed and filled while selected,
+/// frameless otherwise.
+pub fn ghost_icon_toggle_button(
+    ui: &mut Ui,
+    glyph: &str,
+    selected: bool,
+    size: Vec2,
+    tooltip: &str,
+) -> Response {
+    add_glyph_button(
+        ui,
+        glyph_button(glyph, size)
+            .selected(selected)
+            .frame_when_inactive(selected),
+        size,
+        tooltip,
+    )
+}
+
+fn glyph_button(glyph: &str, size: Vec2) -> egui::Button<'_> {
+    egui::Button::new(RichText::new(glyph).size(size.y * 0.55))
+}
+
+fn add_glyph_button(ui: &mut Ui, button: egui::Button<'_>, size: Vec2, tooltip: &str) -> Response {
+    let button_size = egui::vec2(size.x, size.y.max(ui.spacing().interact_size.y));
+    ui.add_sized(button_size, button).on_hover_text(tooltip)
 }
 
 pub fn icon_button_enabled(
@@ -252,24 +287,6 @@ pub fn toggle_button(ui: &mut Ui, label: impl Into<egui::WidgetText>, selected: 
             .frame(true)
             .corner_radius(CARD_RADIUS),
     )
-}
-
-/// An on/off option drawn as a [`toggle_button`]. Clicking flips `value` and
-/// marks the response changed, as `ui.checkbox` does, and assistive
-/// technology sees a checkbox with its checked state.
-pub fn toggle(ui: &mut Ui, value: &mut bool, label: impl Into<egui::WidgetText>) -> Response {
-    let label = label.into();
-    let text = label.text().to_owned();
-    let mut response = toggle_button(ui, label, *value);
-    if response.clicked() {
-        *value = !*value;
-        response.mark_changed();
-    }
-    let (enabled, checked) = (ui.is_enabled(), *value);
-    response.widget_info(|| {
-        egui::WidgetInfo::selected(egui::WidgetType::Checkbox, enabled, checked, &text)
-    });
-    response
 }
 
 pub fn navigation_row(
@@ -391,97 +408,31 @@ mod tests {
         });
     }
 
-    fn click_toggle(value: &mut bool, enabled: bool) -> (bool, Option<egui::WidgetInfo>) {
+    #[test]
+    fn ghost_icon_buttons_keep_icon_button_geometry() {
+        egui::__run_test_ui(|ui| {
+            ui.spacing_mut().interact_size.y = CONTROL_HEIGHT;
+            let size = egui::vec2(26.0, 20.0);
+            let framed = icon_button(ui, "×", size, "Close").rect.size();
+            let ghost = ghost_icon_button(ui, "×", size, "Close").rect.size();
+            let toggle = ghost_icon_toggle_button(ui, "×", true, size, "Close")
+                .rect
+                .size();
+            assert_eq!(ghost, framed);
+            assert_eq!(toggle, framed);
+        });
+    }
+
+    #[test]
+    fn ghost_icon_toggles_report_their_selected_state() {
         let ctx = egui::Context::default();
-        let mut changed = false;
-        let mut info = None;
-        let mut rect = egui::Rect::NOTHING;
-        for events in [
-            vec![],
-            vec![
-                egui::Event::PointerMoved(egui::Pos2::ZERO),
-                egui::Event::PointerButton {
-                    pos: egui::Pos2::ZERO,
-                    button: egui::PointerButton::Primary,
-                    pressed: true,
-                    modifiers: egui::Modifiers::NONE,
-                },
-            ],
-            vec![egui::Event::PointerButton {
-                pos: egui::Pos2::ZERO,
-                button: egui::PointerButton::Primary,
-                pressed: false,
-                modifiers: egui::Modifiers::NONE,
-            }],
-        ] {
-            let events = events
-                .into_iter()
-                .map(|event| match event {
-                    egui::Event::PointerMoved(_) => egui::Event::PointerMoved(rect.center()),
-                    egui::Event::PointerButton {
-                        button,
-                        pressed,
-                        modifiers,
-                        ..
-                    } => egui::Event::PointerButton {
-                        pos: rect.center(),
-                        button,
-                        pressed,
-                        modifiers,
-                    },
-                    other => other,
-                })
-                .collect();
-            let output = ctx.run_ui(
-                egui::RawInput {
-                    events,
-                    ..Default::default()
-                },
-                |ui| {
-                    ui.add_enabled_ui(enabled, |ui| {
-                        let response = toggle(ui, value, "Option");
-                        rect = response.rect;
-                        changed |= response.changed();
-                    });
-                },
-            );
-            info = output
-                .platform_output
-                .events
-                .iter()
-                .rev()
-                .find_map(|event| match event {
-                    egui::output::OutputEvent::ValueChanged(info)
-                    | egui::output::OutputEvent::Clicked(info) => Some(info.clone()),
-                    _ => None,
-                })
-                .or(info);
-        }
-        (changed, info)
-    }
-
-    #[test]
-    fn toggles_flip_on_click_and_report_a_checkbox_state() {
-        let mut value = false;
-        let (changed, info) = click_toggle(&mut value, true);
-        assert!(value);
-        assert!(changed);
-        let info = info.expect("toggle reports its click");
-        assert_eq!(info.typ, egui::WidgetType::Checkbox);
+        let events = crate::test_support::click(
+            &ctx,
+            |ui| ghost_icon_toggle_button(ui, "*", true, egui::vec2(32.0, 32.0), "Pin").rect,
+            |rect| rect.center(),
+        );
+        let info = crate::test_support::last_widget_info(&events).expect("click is reported");
         assert_eq!(info.selected, Some(true));
-        assert_eq!(info.label.as_deref(), Some("Option"));
-
-        let (changed, _) = click_toggle(&mut value, true);
-        assert!(!value);
-        assert!(changed);
-    }
-
-    #[test]
-    fn disabled_toggles_ignore_clicks() {
-        let mut value = false;
-        let (changed, _) = click_toggle(&mut value, false);
-        assert!(!value);
-        assert!(!changed);
     }
 
     #[test]

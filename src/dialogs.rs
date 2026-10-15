@@ -127,31 +127,80 @@ pub fn dialog_confirmation_buttons(
     destructive: bool,
     keyboard: DialogKeyboard,
 ) -> DialogAction {
-    let keyboard = dialog_confirmation_keyboard(keyboard, destructive);
     let mut action = DialogAction::None;
-    let cancel_label = cancel_label.into();
-    let confirm_label = confirm_label.into();
     dialog_button_row(ui, |ui| {
-        let confirm = ui
-            .add_enabled_ui(confirm_enabled, |ui| {
-                if destructive {
-                    destructive_button(ui, confirm_label)
-                } else {
-                    primary_action_button(ui, confirm_label)
-                }
-            })
-            .inner;
-        if confirm.clicked() {
-            action = DialogAction::Confirm;
-        }
-        if secondary_button(ui, cancel_label).clicked() {
-            action = DialogAction::Cancel;
-        }
+        action = confirmation_buttons(
+            ui,
+            cancel_label,
+            confirm_label,
+            confirm_enabled,
+            destructive,
+        );
     });
     if action == DialogAction::None {
-        action = dialog_keyboard_action(ui, keyboard, confirm_enabled);
+        action = dialog_keyboard_action(
+            ui,
+            dialog_confirmation_keyboard(keyboard, destructive),
+            confirm_enabled,
+        );
     }
     action
+}
+
+/// The confirm and cancel actions of [`dialog_confirmation_buttons`] for a
+/// [`crate::Dialog`] footer, which lays its actions out itself. Enter and
+/// Escape follow `keyboard`; a destructive confirmation never takes Enter.
+pub fn dialog_confirmation_actions(
+    ui: &mut Ui,
+    cancel_label: impl Into<egui::WidgetText>,
+    confirm_label: impl Into<egui::WidgetText>,
+    confirm_enabled: bool,
+    destructive: bool,
+    keyboard: DialogKeyboard,
+) -> DialogAction {
+    let action = confirmation_buttons(
+        ui,
+        cancel_label,
+        confirm_label,
+        confirm_enabled,
+        destructive,
+    );
+    if action != DialogAction::None {
+        return action;
+    }
+    dialog_keyboard_action(
+        ui,
+        dialog_confirmation_keyboard(keyboard, destructive),
+        confirm_enabled,
+    )
+}
+
+/// Adds the confirm action, then cancel: in a right-to-left row the confirm
+/// action ends up last, and in a stacked footer it comes first.
+fn confirmation_buttons(
+    ui: &mut Ui,
+    cancel_label: impl Into<egui::WidgetText>,
+    confirm_label: impl Into<egui::WidgetText>,
+    confirm_enabled: bool,
+    destructive: bool,
+) -> DialogAction {
+    let confirm_label = confirm_label.into();
+    let confirm = ui
+        .add_enabled_ui(confirm_enabled, |ui| {
+            if destructive {
+                destructive_button(ui, confirm_label)
+            } else {
+                primary_action_button(ui, confirm_label)
+            }
+        })
+        .inner;
+    if confirm.clicked() {
+        DialogAction::Confirm
+    } else if secondary_button(ui, cancel_label).clicked() {
+        DialogAction::Cancel
+    } else {
+        DialogAction::None
+    }
 }
 
 /// The single-line text field for dialogs: control height, filling the
@@ -252,21 +301,25 @@ pub(crate) fn footer_reserve(ctx: &egui::Context) -> f32 {
     }
 }
 
-// TODO: Evaluate migrating standard confirmation/form dialogs to `egui::Modal` so
-// background interaction is structurally blocked while preserving desktop/Android behavior.
-pub fn dialog_window(
-    title: impl Into<String>,
-    ctx: &egui::Context,
-    preferred_width: f32,
-) -> DialogWindow {
-    // egui popups close on Escape without consuming the key. Handle an existing
-    // popup before rendering the window's controls so their keyboard fallback
-    // cannot also cancel the parent dialog in the same frame.
+/// egui popups close on Escape without consuming the key. Handle an existing
+/// popup before rendering a dialog's controls so their keyboard fallback
+/// cannot also cancel the parent dialog in the same frame.
+pub(crate) fn close_popups_on_escape(ctx: &egui::Context) {
     if egui::Popup::is_any_open(ctx)
         && ctx.input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Escape))
     {
         egui::Popup::close_all(ctx);
     }
+}
+
+/// A non-modal dialog window: the rest of the UI stays interactive. New
+/// dialogs use the modal [`crate::Dialog`].
+pub fn dialog_window(
+    title: impl Into<String>,
+    ctx: &egui::Context,
+    preferred_width: f32,
+) -> DialogWindow {
+    close_popups_on_escape(ctx);
     let available =
         ctx.content_rect().size() - egui::vec2(DIALOG_VIEWPORT_PADDING, DIALOG_VIEWPORT_PADDING);
     let available = egui::vec2(available.x.max(1.0), available.y.max(1.0));

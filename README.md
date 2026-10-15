@@ -18,6 +18,24 @@ metrics can be switched at runtime, and the "Enabled" toggle shows disabled
 states; Tab moves keyboard focus. `cargo test` renders it headlessly in every
 combination.
 
+## Changes in 2.4
+
+- `toggle` and `toggle_with_help` draw a label and a sliding switch instead of
+  a toggle button. `toggle` hugs its label; `toggle_with_help` fills the row
+  and puts the switch at its end. Signatures and checkbox semantics are
+  unchanged. `toggle_button` stays for tool modes.
+- `ghost_icon_button` and `ghost_icon_toggle_button`: icon buttons whose frame
+  appears only on hover, press, focus or selection, for dense rows.
+- `segmented_control`: one choice among a few options in a single track with a
+  sliding highlight; arrow keys move the selection.
+- `chip`: a pill-shaped selectable option for filters and quick choices.
+- `menu_checkbox_item`: a menu row with a check mark for on/off options.
+- `Dialog` (with `DialogSize` and `DialogResponse`): a modal dialog with a
+  dimmed backdrop, a header with an optional close button, a scrolling body and
+  a fixed footer. It becomes a bottom sheet on narrow viewports and touch
+  layouts in portrait. `dialog_confirmation_actions` adds confirm and cancel
+  actions to its footer.
+
 ## Changes in 2.3
 
 - `AnimatedImage`: a short looping clip, such as a bundled help clip, decoded

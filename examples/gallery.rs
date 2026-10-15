@@ -6,12 +6,14 @@
 
 use eframe::egui::{self, Color32, Ui};
 use moduwu_design::{
-    action_row, checkbox_with_help, content_card, destructive_button, dialog_confirmation_buttons,
-    dialog_window, dropdown_menu, form_combo, form_row, form_row_with_help, full_width_button,
-    icon_button, icon_toggle_button, menu_item, navigation_row, panel_title, primary_button,
-    secondary_button, section_card, section_card_with_help, segmented_button, singleline_text_edit,
-    tab_button, toggle_button, toggle_with_help, toolbar_button, toolbar_row, AngleDial,
-    AnimatedImage, Design, DialogAction, DialogKeyboard, DialogPreview, Metrics, NumberField,
+    action_row, checkbox_with_help, chip, content_card, destructive_button,
+    dialog_confirmation_actions, dialog_confirmation_buttons, dialog_window, dropdown_menu,
+    form_combo, form_row, form_row_with_help, full_width_button, ghost_icon_button,
+    ghost_icon_toggle_button, icon_button, icon_toggle_button, menu_checkbox_item, menu_item,
+    navigation_row, panel_title, primary_button, secondary_button, section_card,
+    section_card_with_help, segmented_button, segmented_control, singleline_text_edit, tab_button,
+    toggle, toggle_button, toggle_with_help, toolbar_button, toolbar_row, AngleDial, AnimatedImage,
+    Design, Dialog, DialogAction, DialogKeyboard, DialogPreview, DialogSize, Metrics, NumberField,
     Slider, SliderLayout, DIALOG_WIDTH_FORM, DIALOG_WIDTH_PREVIEW,
 };
 
@@ -57,7 +59,10 @@ struct Gallery {
     opacity: f32,
     angle: f32,
     choice: usize,
+    /// Which `CHOICES` chips are selected.
+    chips: [bool; 3],
     dialog_open: bool,
+    modal_open: bool,
     preview_dialog_open: bool,
     /// A clip for the preview dialog, decoded on first use.
     clip: Option<AnimatedImage>,
@@ -82,7 +87,9 @@ impl Default for Gallery {
             opacity: 80.0,
             angle: -30.0,
             choice: 0,
+            chips: [true, false, false],
             dialog_open: false,
+            modal_open: false,
             preview_dialog_open: false,
             clip: None,
         }
@@ -114,6 +121,7 @@ impl Gallery {
         });
         self.dialog(ui.ctx());
         self.preview_dialog(ui.ctx());
+        self.modal(ui.ctx());
     }
 
     fn settings(&mut self, ui: &mut Ui) {
@@ -165,6 +173,26 @@ impl Gallery {
                 toolbar_button(ui, "Toolbar", 96.0);
             });
             full_width_button(ui, "Full width");
+        });
+
+        section_card(ui, "Choices", |ui| {
+            let modes = [(0, "Library"), (1, "Develop"), (2, "Settings")];
+            segmented_control(ui, &mut self.tab, &modes, ui.available_width().min(300.0));
+            action_row(ui, |ui| {
+                for (selected, label) in self.chips.iter_mut().zip(CHOICES) {
+                    if chip(ui, label, *selected).clicked() {
+                        *selected = !*selected;
+                    }
+                }
+            });
+            let icon = egui::vec2(32.0, 32.0);
+            ui.horizontal(|ui| {
+                ghost_icon_button(ui, "+", icon, "Add");
+                if ghost_icon_toggle_button(ui, "*", self.toggled, icon, "Toggle").clicked() {
+                    self.toggled = !self.toggled;
+                }
+                toggle(ui, &mut self.toggled, "Switch");
+            });
         });
 
         section_card_with_help(
@@ -245,9 +273,13 @@ impl Gallery {
                 dropdown_menu(&menu, |ui| {
                     menu_item(ui, true, "Enabled item");
                     menu_item(ui, false, "Disabled item");
+                    menu_checkbox_item(ui, &mut self.checked, "Checkable item");
                 });
                 if secondary_button(ui, "Dialog").clicked() {
                     self.dialog_open = true;
+                }
+                if secondary_button(ui, "Modal dialog").clicked() {
+                    self.modal_open = true;
                 }
                 if secondary_button(ui, "Preview dialog").clicked() {
                     self.preview_dialog_open = true;
@@ -279,6 +311,38 @@ impl Gallery {
                 self.dialog_open = false;
             }
         });
+    }
+
+    /// A modal dialog; a bottom sheet in narrow windows and Android portrait.
+    fn modal(&mut self, ctx: &egui::Context) {
+        if !self.modal_open {
+            return;
+        }
+        let mut action = DialogAction::None;
+        let response = Dialog::new("gallery-modal", "Modal dialog")
+            .size(DialogSize::Wide)
+            .close_button(true)
+            .dismiss_on_backdrop(true)
+            .show_with_footer(
+                ctx,
+                |ui| {
+                    ui.label("Enter confirms, Escape cancels and a backdrop click dismisses.");
+                    toggle_with_help(ui, &mut self.checked, "Switch", "A switch with help.");
+                },
+                |ui| {
+                    action = dialog_confirmation_actions(
+                        ui,
+                        "Cancel",
+                        "Confirm",
+                        true,
+                        false,
+                        DialogKeyboard::CONFIRM_ON_ENTER,
+                    );
+                },
+            );
+        if response.dismissed || action != DialogAction::None {
+            self.modal_open = false;
+        }
     }
 
     /// The preview stays in view beside or above the controls, which scroll.
@@ -389,6 +453,7 @@ mod tests {
                         enabled,
                         compact_sliders,
                         dialog_open: true,
+                        modal_open: true,
                         preview_dialog_open: true,
                         ..Gallery::default()
                     };

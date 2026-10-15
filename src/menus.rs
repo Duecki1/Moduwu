@@ -1,4 +1,4 @@
-use egui::{self, Align2, InnerResponse, Response, Sense, StrokeKind, Ui};
+use egui::{self, Align2, InnerResponse, Response, Sense, Stroke, StrokeKind, TextWrapMode, Ui};
 
 pub fn menu_item(ui: &mut Ui, enabled: bool, label: impl Into<egui::WidgetText>) -> Response {
     ui.add_enabled(enabled, egui::Button::new(label))
@@ -7,6 +7,81 @@ pub fn menu_item(ui: &mut Ui, enabled: bool, label: impl Into<egui::WidgetText>)
 pub fn destructive_menu_item(ui: &mut Ui, label: impl Into<egui::WidgetText>) -> Response {
     let color = ui.visuals().error_fg_color;
     menu_item(ui, true, label.into().color(color))
+}
+
+/// A menu row with a check mark before its label, for on/off options in
+/// menus. Clicking it, or Space and Enter while it has focus, flips `value`
+/// and marks the response changed; assistive technology sees a checkbox. The
+/// menu stays open, so the caller decides whether to close it.
+pub fn menu_checkbox_item(
+    ui: &mut Ui,
+    value: &mut bool,
+    label: impl Into<egui::WidgetText>,
+) -> Response {
+    let label = label.into();
+    let text = label.text().to_owned();
+    let spacing = ui.spacing();
+    let (padding, check_edge, gap) = (
+        spacing.button_padding,
+        spacing.icon_width,
+        spacing.icon_spacing,
+    );
+    let galley = label.into_galley(
+        ui,
+        Some(TextWrapMode::Extend),
+        f32::INFINITY,
+        egui::TextStyle::Button,
+    );
+    let desired = egui::vec2(
+        padding.x * 2.0 + check_edge + gap + galley.size().x,
+        ui.spacing()
+            .interact_size
+            .y
+            .max(galley.size().y + padding.y * 2.0),
+    );
+    let (rect, mut response) = ui.allocate_at_least(desired, Sense::click());
+    if response.clicked() {
+        *value = !*value;
+        response.mark_changed();
+    }
+    let (enabled, checked) = (ui.is_enabled(), *value);
+    response.widget_info(|| {
+        egui::WidgetInfo::selected(egui::WidgetType::Checkbox, enabled, checked, &text)
+    });
+    if !ui.is_rect_visible(rect) {
+        return response;
+    }
+
+    let visuals = ui.style().interact(&response);
+    let painter = ui.painter();
+    if response.hovered() || response.has_focus() {
+        painter.rect(
+            rect,
+            visuals.corner_radius,
+            visuals.weak_bg_fill,
+            visuals.bg_stroke,
+            StrokeKind::Inside,
+        );
+    }
+    let check = egui::Rect::from_center_size(
+        egui::pos2(rect.left() + padding.x + check_edge * 0.5, rect.center().y),
+        egui::Vec2::splat(check_edge),
+    );
+    if checked {
+        let point = |x: f32, y: f32| {
+            egui::pos2(
+                egui::lerp(check.left()..=check.right(), x),
+                egui::lerp(check.top()..=check.bottom(), y),
+            )
+        };
+        painter.add(egui::Shape::line(
+            vec![point(0.15, 0.55), point(0.4, 0.8), point(0.85, 0.25)],
+            Stroke::new(2.0, visuals.text_color()),
+        ));
+    }
+    let text_pos = egui::pos2(check.right() + gap, rect.center().y - galley.size().y * 0.5);
+    painter.galley(text_pos, galley, visuals.text_color());
+    response
 }
 
 const OVERFLOW_INSET: f32 = 5.0;
@@ -150,6 +225,38 @@ mod tests {
             let (next_rect, _) =
                 ui.allocate_exact_size(egui::vec2(56.0, 62.0), egui::Sense::click());
             assert!(next_rect.top() >= card_rect.bottom());
+        });
+    }
+
+    #[test]
+    fn menu_checkbox_items_flip_and_report_a_checkbox() {
+        let ctx = egui::Context::default();
+        let mut value = false;
+        let mut changed = false;
+        let events = crate::test_support::click(
+            &ctx,
+            |ui| {
+                let response = menu_checkbox_item(ui, &mut value, "Invert");
+                changed |= response.changed();
+                response.rect
+            },
+            |rect| rect.center(),
+        );
+        assert!(value);
+        assert!(changed);
+        let info = crate::test_support::last_widget_info(&events).expect("item reports its click");
+        assert_eq!(info.typ, egui::WidgetType::Checkbox);
+        assert_eq!(info.selected, Some(true));
+        assert_eq!(info.label.as_deref(), Some("Invert"));
+    }
+
+    #[test]
+    fn menu_checkbox_items_match_menu_item_height() {
+        egui::__run_test_ui(|ui| {
+            let mut value = true;
+            let item = menu_item(ui, true, "Duplicate").rect.height();
+            let checkbox = menu_checkbox_item(ui, &mut value, "Invert").rect.height();
+            assert_eq!(checkbox, item);
         });
     }
 
