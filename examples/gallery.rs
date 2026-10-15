@@ -249,7 +249,6 @@ impl Gallery {
             Slider::new("Exposure", &mut self.exposure, -5.0..=5.0)
                 .decimals(2)
                 .step(0.05)
-                .hover_text("Bipolar range with a centre mark.")
                 .layout(layout)
                 .show(ui);
             Slider::new("Opacity", &mut self.opacity, 0.0..=100.0)
@@ -261,9 +260,7 @@ impl Gallery {
                 .gradient(|t| egui::ecolor::Hsva::new(t, 0.9, 0.92, 1.0).into())
                 .layout(layout)
                 .show(ui);
-            AngleDial::new("Angle", &mut self.angle)
-                .hover_text("Drag the dial; Shift snaps to 15°.")
-                .show(ui);
+            AngleDial::new("Angle", &mut self.angle).show(ui);
         });
 
         content_card(ui, |ui| {

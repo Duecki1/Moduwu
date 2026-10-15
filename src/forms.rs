@@ -127,6 +127,7 @@ pub fn combo_box(
         .selected_text(selected_text)
         .width(width)
         .truncate()
+        .popup_style(crate::menus::menu_popup_style())
 }
 
 pub fn form_combo(

@@ -62,3 +62,42 @@ pub(crate) fn last_widget_info(events: &[egui::output::OutputEvent]) -> Option<e
         _ => None,
     })
 }
+
+/// Where `show` paints `text` with the pointer away, then resting on the
+/// widget, in a themed context.
+pub(crate) fn label_positions_idle_and_hovered(
+    text: &str,
+    mut show: impl FnMut(&mut Ui) -> Rect,
+) -> (Pos2, Pos2) {
+    let ctx = egui::Context::default();
+    crate::Design::ObsidianBlue.theme().apply(&ctx);
+    let mut paint = |events: Vec<egui::Event>| {
+        let mut rect = Rect::NOTHING;
+        let output = ctx.run_ui(
+            egui::RawInput {
+                events,
+                ..Default::default()
+            },
+            |ui| rect = show(ui),
+        );
+        let pos = output
+            .shapes
+            .iter()
+            .find_map(|clipped| text_pos(&clipped.shape, text))
+            .expect("the label is painted");
+        (rect, pos)
+    };
+    let (rect, _) = paint(vec![egui::Event::PointerMoved(egui::pos2(-50.0, -50.0))]);
+    let (_, idle) = paint(Vec::new());
+    paint(vec![egui::Event::PointerMoved(rect.center())]);
+    let (_, hovered) = paint(Vec::new());
+    (idle, hovered)
+}
+
+fn text_pos(shape: &egui::Shape, text: &str) -> Option<Pos2> {
+    match shape {
+        egui::Shape::Text(shape) if shape.galley.text() == text => Some(shape.pos),
+        egui::Shape::Vec(shapes) => shapes.iter().find_map(|shape| text_pos(shape, text)),
+        _ => None,
+    }
+}

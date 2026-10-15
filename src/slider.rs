@@ -4,8 +4,8 @@
 //! do not steal scrolling, and claims the pointer once a drag is clearly
 //! horizontal. Scroll areas ask [`slider_scroll_locked`] whether a slider owns
 //! the current drag. Double-clicking the label, track or value resets to
-//! [`Slider::reset_to`], zero by default. Only the label has a tooltip, shown
-//! once the pointer rests on it, so adjusting values never raises one.
+//! [`Slider::reset_to`], zero by default. Sliders show no tooltip: a hint
+//! must not cover a control while it is being adjusted.
 
 use std::ops::RangeInclusive;
 
@@ -15,7 +15,6 @@ use crate::buttons::interaction_visuals_for_flags;
 use crate::metrics::Metrics;
 use crate::number_field::NumberField;
 use crate::responsive::is_compact_portrait;
-use crate::tooltip::still_hover_text;
 
 const TRACK_DRAG_THRESHOLD: f32 = 8.0;
 const HANDLE_DRAG_THRESHOLD: f32 = 2.0;
@@ -100,7 +99,6 @@ pub struct Slider<'a, Num> {
     decimals: usize,
     step: f64,
     reset_value: f64,
-    hover_text: Option<&'a str>,
     accent: Option<Color32>,
     gradient: Option<Box<dyn Fn(f32) -> Color32 + 'a>>,
     metrics: Option<SliderMetrics>,
@@ -118,7 +116,6 @@ impl<'a, Num: Numeric + Copy> Slider<'a, Num> {
             decimals: 0,
             step: 1.0,
             reset_value: 0.0,
-            hover_text: None,
             accent: None,
             gradient: None,
             metrics: None,
@@ -142,13 +139,6 @@ impl<'a, Num: Numeric + Copy> Slider<'a, Num> {
     /// it from the first value shown: widgets are reused across documents.
     pub fn reset_to(mut self, reset_value: Num) -> Self {
         self.reset_value = reset_value.to_f64();
-        self
-    }
-
-    /// Help shown on the label, followed by the reset hint. A track rendered
-    /// with [`Self::show_track`] has no label and shows no tooltip.
-    pub fn hover_text(mut self, hover_text: impl Into<Option<&'a str>>) -> Self {
-        self.hover_text = hover_text.into();
         self
     }
 
@@ -223,7 +213,6 @@ impl<'a, Num: Numeric + Copy> Slider<'a, Num> {
             decimals: self.decimals,
             step: self.step,
             reset_value: self.reset_value.clamp(start.min(end), start.max(end)),
-            hover_text: self.hover_text,
             accent: self.accent,
             gradient: self.gradient,
             metrics: self.metrics.unwrap_or_else(|| SliderMetrics::of(ctx)),
@@ -237,7 +226,6 @@ struct TrackOptions<'a> {
     decimals: usize,
     step: f64,
     reset_value: f64,
-    hover_text: Option<&'a str>,
     accent: Option<Color32>,
     gradient: Option<Box<dyn Fn(f32) -> Color32 + 'a>>,
     metrics: SliderMetrics,
@@ -246,13 +234,6 @@ struct TrackOptions<'a> {
 impl TrackOptions<'_> {
     fn reset<Num: Numeric + Copy>(&self, value: &mut Num) -> bool {
         set_numeric(value, self.reset_value, self.decimals)
-    }
-
-    fn reset_tooltip(&self) -> String {
-        match self.hover_text {
-            Some(text) => format!("{text}\nDouble-click to reset."),
-            None => "Double-click to reset.".to_owned(),
-        }
     }
 }
 
@@ -271,11 +252,7 @@ fn compact_row<Num: Numeric + Copy>(
         Layout::left_to_right(Align::Center),
         |ui| {
             ui.spacing_mut().item_spacing.x = COMPACT_ROW_GAP;
-            let label_tooltip = format!("{}\n{}", track.label, track.reset_tooltip());
-            let label_response = still_hover_text(
-                compact_label(ui, track.label, track.accent, label_width, metrics),
-                label_tooltip,
-            );
+            let label_response = compact_label(ui, track.label, track.accent, label_width, metrics);
             if label_response.double_clicked() {
                 changed |= track.reset(value);
             }
@@ -319,7 +296,7 @@ fn stacked_rows<Num: Numeric + Copy>(
             } else {
                 ui.add(egui::Label::new(track.label).sense(Sense::click()))
             };
-            if still_hover_text(label_response, track.reset_tooltip()).double_clicked() {
+            if label_response.double_clicked() {
                 changed |= track.reset(value);
             }
 
@@ -952,28 +929,9 @@ mod tests {
     }
 
     #[test]
-    fn label_tooltip_waits_for_the_pointer_to_rest() {
-        let label = pos2(20.0, METRICS.header_height * 0.5);
-        let mut harness = Harness::new();
-        harness.rest(label, 0.2);
-        assert!(!harness.tooltip_open());
-        harness.rest(label, 1.0);
-        assert!(harness.tooltip_open());
-
-        // A tooltip shown moments ago does not let the next one skip the wait.
-        harness.frame(vec![Event::PointerMoved(pos2(24.0, label.y))]);
-        harness.frame(vec![Event::PointerMoved(pos2(20.0, TRACK_Y))]);
-        harness.frame(vec![Event::PointerMoved(pos2(
-            20.0,
-            METRICS.header_height + 60.0,
-        ))]);
-        harness.frame(vec![Event::PointerMoved(label)]);
-        assert!(!harness.tooltip_open());
-    }
-
-    #[test]
-    fn track_and_value_field_never_show_a_tooltip() {
+    fn no_part_of_a_slider_shows_a_tooltip() {
         for pos in [
+            pos2(20.0, METRICS.header_height * 0.5),
             pos2(200.0, TRACK_Y),
             pos2(390.0, METRICS.header_height * 0.5),
         ] {

@@ -28,7 +28,6 @@ pub struct AngleDial<'a> {
     decimals: usize,
     step: f32,
     reset_value: f32,
-    hover_text: Option<&'a str>,
 }
 
 impl<'a> AngleDial<'a> {
@@ -42,7 +41,6 @@ impl<'a> AngleDial<'a> {
             decimals: 0,
             step: 1.0,
             reset_value: 0.0,
-            hover_text: None,
         }
     }
 
@@ -69,18 +67,9 @@ impl<'a> AngleDial<'a> {
         self
     }
 
-    pub fn hover_text(mut self, hover_text: impl Into<Option<&'a str>>) -> Self {
-        self.hover_text = hover_text.into();
-        self
-    }
-
     /// Shows the dial and returns whether the value changed.
     pub fn show(self, ui: &mut Ui) -> bool {
         let metrics = SliderMetrics::of(ui.ctx());
-        let tooltip = match self.hover_text {
-            Some(text) => format!("{text}\nDouble-click to reset."),
-            None => "Double-click to reset.".to_owned(),
-        };
         let (min, max) = ordered(&self.range);
         let reset_value = self.reset_value.clamp(min, max);
         let decimals = self.decimals;
@@ -92,9 +81,7 @@ impl<'a> AngleDial<'a> {
                 egui::vec2(width, metrics.header_height),
                 Layout::left_to_right(Align::Center),
                 |ui| {
-                    let label = ui
-                        .add(egui::Label::new(self.label).sense(Sense::click()))
-                        .on_hover_text(&tooltip);
+                    let label = ui.add(egui::Label::new(self.label).sense(Sense::click()));
                     if label.double_clicked() {
                         changed |= set_numeric(value, f64::from(reset_value), decimals);
                     }
@@ -108,7 +95,7 @@ impl<'a> AngleDial<'a> {
                             metrics,
                         );
                         changed |= field_changed;
-                        if field.on_hover_text(&tooltip).double_clicked() {
+                        if field.double_clicked() {
                             changed |= set_numeric(value, f64::from(reset_value), decimals);
                         }
                         let options = DialOptions {
@@ -120,7 +107,7 @@ impl<'a> AngleDial<'a> {
                             reset_value,
                             edge: metrics.header_height,
                         };
-                        changed |= dial(ui, value, &options).on_hover_text(&tooltip).changed();
+                        changed |= dial(ui, value, &options).changed();
                     });
                 },
             );

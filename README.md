@@ -18,6 +18,20 @@ metrics can be switched at runtime, and the "Enabled" toggle shows disabled
 states; Tab moves keyboard focus. `cargo test` renders it headlessly in every
 combination.
 
+## Changes in 3.0
+
+- Breaking: `Slider::hover_text` and `AngleDial::hover_text` are removed, and
+  sliders and dials no longer show a "Double-click to reset" tooltip. A hint
+  must not cover a control while it is dragged; put help on a static label or
+  heading instead. Double-click still resets.
+- Frameless controls (`ghost_icon_button`, `ghost_icon_toggle_button`,
+  unselected `navigation_row`, `context_menu_item`, `chip`) and the rows of
+  Moduwu menus and combo boxes no longer shift their label by a pixel when
+  hovered. Menu and combo-box rows are flat until hovered.
+- Icon buttons (`icon_button`, `icon_toggle_button` and the ghost variants)
+  are exactly the requested width with the glyph centred. Button padding made
+  them about 4 px wider, which overflowed wrapping rows.
+
 ## Changes in 2.4
 
 - `toggle` and `toggle_with_help` draw a label and a sliding switch instead of

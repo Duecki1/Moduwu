@@ -148,14 +148,22 @@ pub fn segmented_control<T: PartialEq + Copy>(
 /// several.
 pub fn chip(ui: &mut Ui, label: impl Into<egui::WidgetText>, selected: bool) -> Response {
     let height = control_height(ui);
-    let mut button = egui::Button::new(label.into())
+    let button = egui::Button::new(label.into())
         .selected(selected)
+        .frame(true)
         .corner_radius(height * 0.5)
         .min_size(egui::vec2(height, height));
-    if !selected {
-        button = button.fill(Color32::TRANSPARENT);
-    }
-    ui.add(button)
+    // Outlined while idle in panels and menus alike; menus drop the idle
+    // border of other buttons.
+    let border = ui.visuals().widgets.noninteractive.bg_stroke;
+    crate::buttons::with_idle_visuals(
+        ui,
+        |idle| {
+            idle.bg_stroke = border;
+            idle.weak_bg_fill = Color32::TRANSPARENT;
+        },
+        |ui| ui.add(button),
+    )
 }
 
 #[cfg(test)]

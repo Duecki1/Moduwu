@@ -185,12 +185,9 @@ pub fn icon_toggle_button(
 /// card headers and toolbars: its frame appears only on hover, press and
 /// focus. Keep framed buttons for the actions a row is about.
 pub fn ghost_icon_button(ui: &mut Ui, glyph: &str, size: Vec2, tooltip: &str) -> Response {
-    add_glyph_button(
-        ui,
-        glyph_button(glyph, size).frame_when_inactive(false),
-        size,
-        tooltip,
-    )
+    add_with_hidden_idle_frame(ui, |ui| {
+        add_glyph_button(ui, glyph_button(glyph, size).frame(true), size, tooltip)
+    })
 }
 
 /// Toggle variant of [`ghost_icon_button`]: framed and filled while selected,
@@ -202,23 +199,65 @@ pub fn ghost_icon_toggle_button(
     size: Vec2,
     tooltip: &str,
 ) -> Response {
-    add_glyph_button(
+    let button = glyph_button(glyph, size).selected(selected).frame(true);
+    if selected {
+        add_glyph_button(ui, button, size, tooltip)
+    } else {
+        add_with_hidden_idle_frame(ui, |ui| add_glyph_button(ui, button, size, tooltip))
+    }
+}
+
+/// Adds a framed button whose idle frame is transparent, so it looks
+/// frameless until hovered, pressed or focused.
+///
+/// egui's own frameless idle state (`frame_when_inactive(false)`) keeps the
+/// padding that makes room for the border but draws no border, so the label
+/// moves by the border width when the frame appears. A transparent frame keeps
+/// its width and the label stays still.
+pub(crate) fn add_with_hidden_idle_frame(
+    ui: &mut Ui,
+    add: impl FnOnce(&mut Ui) -> Response,
+) -> Response {
+    with_idle_visuals(
         ui,
-        glyph_button(glyph, size)
-            .selected(selected)
-            .frame_when_inactive(selected),
-        size,
-        tooltip,
+        |idle| {
+            idle.weak_bg_fill = Color32::TRANSPARENT;
+            idle.bg_fill = Color32::TRANSPARENT;
+            idle.bg_stroke.color = Color32::TRANSPARENT;
+        },
+        add,
     )
+}
+
+/// Adds a widget with the idle widget visuals changed by `restyle`, then
+/// restores them. Unlike `ui.scope`, the widget is laid out in `ui` itself,
+/// so wrapping rows still wrap it.
+pub(crate) fn with_idle_visuals(
+    ui: &mut Ui,
+    restyle: impl FnOnce(&mut egui::style::WidgetVisuals),
+    add: impl FnOnce(&mut Ui) -> Response,
+) -> Response {
+    let saved = ui.visuals().widgets.inactive;
+    restyle(&mut ui.visuals_mut().widgets.inactive);
+    let response = add(ui);
+    ui.visuals_mut().widgets.inactive = saved;
+    response
 }
 
 fn glyph_button(glyph: &str, size: Vec2) -> egui::Button<'_> {
     egui::Button::new(RichText::new(glyph).size(size.y * 0.55))
 }
 
+/// Adds a glyph button exactly `size` wide, centring the glyph. egui's button
+/// padding would otherwise make it wider than requested, which overflows rows
+/// that wrapped on the requested width.
 fn add_glyph_button(ui: &mut Ui, button: egui::Button<'_>, size: Vec2, tooltip: &str) -> Response {
     let button_size = egui::vec2(size.x, size.y.max(ui.spacing().interact_size.y));
-    ui.add_sized(button_size, button).on_hover_text(tooltip)
+    let padding = ui.spacing().button_padding;
+    ui.spacing_mut().button_padding.x = 0.0;
+    let response = ui.add_sized(button_size, button);
+    ui.spacing_mut().button_padding = padding;
+    response.on_hover_text(tooltip)
 }
 
 pub fn icon_button_enabled(
@@ -295,13 +334,17 @@ pub fn navigation_row(
     selected: bool,
     sense: egui::Sense,
 ) -> Response {
-    ui.add_sized(
-        [ui.available_width().max(1.0), control_height(ui)],
-        egui::Button::selectable(selected, ())
-            .left_text(label)
-            .truncate()
-            .sense(sense),
-    )
+    let button = egui::Button::selectable(selected, ())
+        .left_text(label)
+        .truncate()
+        .sense(sense)
+        .frame_when_inactive(true);
+    let size = [ui.available_width().max(1.0), control_height(ui)];
+    if selected {
+        ui.add_sized(size, button)
+    } else {
+        add_with_hidden_idle_frame(ui, |ui| ui.add_sized(size, button))
+    }
 }
 
 pub fn action_row<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) -> InnerResponse<R> {
@@ -409,6 +452,27 @@ mod tests {
     }
 
     #[test]
+    fn themed_icon_buttons_are_exactly_the_requested_width() {
+        let ctx = egui::Context::default();
+        crate::Design::ObsidianBlue.theme().apply(&ctx);
+        let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
+            ui.horizontal_wrapped(|ui| {
+                let size = egui::vec2(32.0, 32.0);
+                let padding = ui.spacing().button_padding;
+                for response in [
+                    icon_button(ui, "W", size, "Wide glyph"),
+                    icon_toggle_button(ui, "W", true, size, "Wide glyph"),
+                    ghost_icon_button(ui, "W", size, "Wide glyph"),
+                    ghost_icon_toggle_button(ui, "W", false, size, "Wide glyph"),
+                ] {
+                    assert_eq!(response.rect.width(), size.x);
+                }
+                assert_eq!(ui.spacing().button_padding, padding);
+            });
+        });
+    }
+
+    #[test]
     fn ghost_icon_buttons_keep_icon_button_geometry() {
         egui::__run_test_ui(|ui| {
             ui.spacing_mut().interact_size.y = CONTROL_HEIGHT;
@@ -433,6 +497,63 @@ mod tests {
         );
         let info = crate::test_support::last_widget_info(&events).expect("click is reported");
         assert_eq!(info.selected, Some(true));
+    }
+
+    #[test]
+    fn frameless_controls_keep_their_label_still_on_hover() {
+        use crate::test_support::label_positions_idle_and_hovered;
+        let size = egui::vec2(32.0, 32.0);
+        type Show<'a> = Box<dyn FnMut(&mut Ui) -> egui::Rect + 'a>;
+        let cases: [(&str, Show<'_>); 6] = [
+            (
+                "+",
+                Box::new(|ui| ghost_icon_button(ui, "+", size, "Add").rect),
+            ),
+            (
+                "*",
+                Box::new(|ui| ghost_icon_toggle_button(ui, "*", false, size, "Pin").rect),
+            ),
+            (
+                "Library",
+                Box::new(|ui| navigation_row(ui, "Library", false, egui::Sense::click()).rect),
+            ),
+            (
+                "Rename",
+                Box::new(|ui| crate::context_menu_item(ui, true, "Rename").rect),
+            ),
+            ("4:3", Box::new(|ui| crate::chip(ui, "4:3", false).rect)),
+            (
+                "Brush",
+                Box::new(|ui| {
+                    crate::menus::menu_popup_style().apply(ui.style_mut());
+                    ui.selectable_label(false, "Brush").rect
+                }),
+            ),
+        ];
+        for (label, show) in cases {
+            let (idle, hovered) = label_positions_idle_and_hovered(label, show);
+            assert_eq!(idle, hovered, "{label}");
+        }
+    }
+
+    #[test]
+    fn frameless_controls_wrap_in_wrapping_rows() {
+        egui::__run_test_ui(|ui| {
+            ui.set_width(100.0);
+            let rects = ui
+                .horizontal_wrapped(|ui| {
+                    let size = egui::vec2(32.0, 32.0);
+                    [
+                        ghost_icon_button(ui, "a", size, "A").rect,
+                        ghost_icon_button(ui, "b", size, "B").rect,
+                        ghost_icon_toggle_button(ui, "c", false, size, "C").rect,
+                        crate::chip(ui, "d", false).rect,
+                    ]
+                })
+                .inner;
+            assert!(rects.iter().all(|rect| rect.right() <= 100.5), "{rects:?}");
+            assert!(rects[2].top() > rects[0].top(), "{rects:?}");
+        });
     }
 
     #[test]

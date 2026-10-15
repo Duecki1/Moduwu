@@ -157,7 +157,7 @@ pub fn context_menu<R>(
     add_contents: impl FnOnce(&mut Ui) -> R,
 ) -> Option<InnerResponse<R>> {
     egui::Popup::context_menu(response)
-        .style(egui::style::StyleModifier::default())
+        .style(menu_popup_style())
         .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
         .show(add_contents)
 }
@@ -167,7 +167,7 @@ pub fn dropdown_menu<R>(
     add_contents: impl FnOnce(&mut Ui) -> R,
 ) -> Option<InnerResponse<R>> {
     egui::Popup::menu(response)
-        .style(egui::style::StyleModifier::default())
+        .style(menu_popup_style())
         .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
         .show(add_contents)
 }
@@ -178,7 +178,7 @@ pub fn dropdown_submenu<'a, R>(
     add_contents: impl FnOnce(&mut Ui) -> R,
 ) -> Response {
     let (response, _) = egui::menu::SubMenuButton::new(label)
-        .config(egui::menu::MenuConfig::new().style(egui::style::StyleModifier::default()))
+        .config(egui::menu::MenuConfig::new().style(menu_popup_style()))
         .ui(ui, add_contents);
     response
 }
@@ -188,7 +188,19 @@ pub fn context_menu_item<'a>(
     enabled: bool,
     label: impl egui::IntoAtoms<'a>,
 ) -> Response {
-    ui.add_enabled(enabled, egui::Button::selectable(false, label))
+    let button = egui::Button::selectable(false, label).frame_when_inactive(true);
+    crate::buttons::add_with_hidden_idle_frame(ui, |ui| ui.add_enabled(enabled, button))
+}
+
+/// The style of Moduwu menus and dropdown lists: rows are flat until hovered.
+/// The idle border is removed, not just hidden, so rows that egui draws
+/// frameless while idle (selectable rows) keep their label in place on hover.
+pub(crate) fn menu_popup_style() -> egui::style::StyleModifier {
+    egui::style::StyleModifier::new(|style: &mut egui::Style| {
+        let idle = &mut style.visuals.widgets.inactive;
+        idle.weak_bg_fill = egui::Color32::TRANSPARENT;
+        idle.bg_stroke = Stroke::NONE;
+    })
 }
 
 #[cfg(test)]
