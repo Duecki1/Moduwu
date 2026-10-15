@@ -18,6 +18,14 @@ metrics can be switched at runtime, and the "Enabled" toggle shows disabled
 states; Tab moves keyboard focus. `cargo test` renders it headlessly in every
 combination.
 
+## Changes in 3.1
+
+- `Dialog::show_with_preview` and `DialogSize::Preview`: the modal dialog
+  with an image preview beside (landscape) or above (portrait and bottom
+  sheets) its scrolling controls, as `DialogWindow::show_with_preview` does.
+- `Dialog::area_id`: the id of a dialog's area, for finding it in egui's
+  memory.
+
 ## Changes in 3.0
 
 - Breaking: `Slider::hover_text` and `AngleDial::hover_text` are removed, and

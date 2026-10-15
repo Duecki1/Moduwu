@@ -71,42 +71,14 @@ impl DialogWindow {
                 .unwrap_or_else(|| footer_reserve(ui.ctx()));
             let item_spacing = ui.spacing().item_spacing.y;
             // egui spaces the action row from the body by one item spacing.
-            let layout = PreviewLayout::new(
-                ui.available_width(),
+            preview_body(
+                ui,
                 (content_height - title_height - item_spacing - actions_height).max(1.0),
-                item_spacing,
-                preview.aspect,
                 landscape,
+                preview,
+                paint_preview,
+                add_controls,
             );
-            let show_preview = |ui: &mut Ui| {
-                let (rect, response) = ui.allocate_exact_size(layout.preview, Sense::hover());
-                response.widget_info(|| {
-                    egui::WidgetInfo::labeled(egui::WidgetType::Image, true, preview.label)
-                });
-                paint_preview(ui, rect);
-            };
-            let show_controls = |ui: &mut Ui| {
-                egui::ScrollArea::vertical()
-                    .id_salt("preview-dialog-controls")
-                    .max_height(layout.controls_max_height)
-                    .auto_shrink([false, true])
-                    .show(ui, add_controls);
-            };
-            if layout.landscape {
-                ui.horizontal_top(|ui| {
-                    ui.allocate_ui_with_layout(
-                        Vec2::new(layout.preview_column_width, layout.preview.y),
-                        egui::Layout::top_down(egui::Align::Center),
-                        show_preview,
-                    );
-                    ui.add_space(SPACE_MD);
-                    ui.vertical(show_controls);
-                });
-            } else {
-                ui.vertical_centered(show_preview);
-                ui.add_space(SPACE_SM);
-                show_controls(ui);
-            }
             let actions_top = ui.cursor().top();
             add_actions(ui);
             let measured = ui.min_rect().bottom() - actions_top;
@@ -115,6 +87,57 @@ impl DialogWindow {
                 ui.ctx().request_repaint();
             }
         })
+    }
+}
+
+/// Lays out `preview` beside the scrolling controls on landscape screens and
+/// above them otherwise, within `body_height`. Returns whether the controls
+/// overflow and scroll.
+pub(crate) fn preview_body(
+    ui: &mut Ui,
+    body_height: f32,
+    landscape: bool,
+    preview: DialogPreview<'_>,
+    paint_preview: impl FnOnce(&mut Ui, egui::Rect),
+    add_controls: impl FnOnce(&mut Ui),
+) -> bool {
+    let layout = PreviewLayout::new(
+        ui.available_width(),
+        body_height,
+        ui.spacing().item_spacing.y,
+        preview.aspect,
+        landscape,
+    );
+    let show_preview = |ui: &mut Ui| {
+        let (rect, response) = ui.allocate_exact_size(layout.preview, Sense::hover());
+        response.widget_info(|| {
+            egui::WidgetInfo::labeled(egui::WidgetType::Image, true, preview.label)
+        });
+        paint_preview(ui, rect);
+    };
+    let show_controls = |ui: &mut Ui| {
+        let output = egui::ScrollArea::vertical()
+            .id_salt("preview-dialog-controls")
+            .max_height(layout.controls_max_height)
+            .auto_shrink([false, true])
+            .show(ui, add_controls);
+        output.content_size.y > output.inner_rect.height() + 0.5
+    };
+    if layout.landscape {
+        ui.horizontal_top(|ui| {
+            ui.allocate_ui_with_layout(
+                Vec2::new(layout.preview_column_width, layout.preview.y),
+                egui::Layout::top_down(egui::Align::Center),
+                show_preview,
+            );
+            ui.add_space(SPACE_MD);
+            ui.vertical(show_controls).inner
+        })
+        .inner
+    } else {
+        ui.vertical_centered(show_preview);
+        ui.add_space(SPACE_SM);
+        show_controls(ui)
     }
 }
 

@@ -4,8 +4,10 @@
 use egui::{self, Align, Align2, Color32, CornerRadius, Layout, Response, RichText, Sense, Ui};
 
 use crate::buttons::ghost_icon_button;
-use crate::dialogs::{close_popups_on_escape, DIALOG_VIEWPORT_PADDING};
+use crate::dialogs::{close_popups_on_escape, DIALOG_VIEWPORT_PADDING, DIALOG_WIDTH_PREVIEW};
 use crate::metrics::{Metrics, SPACE_SM};
+use crate::preview_dialog::{preview_body, DialogPreview};
+use crate::responsive::ScreenLayout;
 
 /// The width of a centred [`Dialog`]. Bottom sheets always span the viewport.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -15,6 +17,8 @@ pub enum DialogSize {
     Compact,
     /// Forms with several rows, lists and longer explanations.
     Wide,
+    /// An image preview beside its controls, for [`Dialog::show_with_preview`].
+    Preview,
 }
 
 impl DialogSize {
@@ -22,6 +26,7 @@ impl DialogSize {
         match self {
             Self::Compact => 400.0,
             Self::Wide => 560.0,
+            Self::Preview => DIALOG_WIDTH_PREVIEW,
         }
     }
 }
@@ -93,12 +98,18 @@ pub struct DialogResponse<R> {
 impl Dialog {
     pub fn new(id_salt: impl egui::AsIdSalt, title: impl Into<String>) -> Self {
         Self {
-            id: egui::Id::new("moduwu-dialog").with(id_salt),
+            id: Self::area_id(id_salt),
             title: title.into(),
             size: DialogSize::default(),
             close_button: false,
             dismiss_on_backdrop: false,
         }
+    }
+
+    /// The id of the area a dialog created with `id_salt` is shown in, for
+    /// looking it up in egui's memory.
+    pub fn area_id(id_salt: impl egui::AsIdSalt) -> egui::Id {
+        egui::Id::new("moduwu-dialog").with(id_salt)
     }
 
     pub fn size(mut self, size: DialogSize) -> Self {
@@ -125,7 +136,11 @@ impl Dialog {
         ctx: &egui::Context,
         add_body: impl FnOnce(&mut Ui) -> R,
     ) -> DialogResponse<R> {
-        self.show_impl(ctx, add_body, None::<fn(&mut Ui)>)
+        self.show_impl(
+            ctx,
+            |ui, max_height, _| scrolling_body(ui, max_height, add_body),
+            None::<fn(&mut Ui)>,
+        )
     }
 
     pub fn show_with_footer<R>(
@@ -134,13 +149,51 @@ impl Dialog {
         add_body: impl FnOnce(&mut Ui) -> R,
         add_footer: impl FnOnce(&mut Ui),
     ) -> DialogResponse<R> {
-        self.show_impl(ctx, add_body, Some(add_footer))
+        self.show_impl(
+            ctx,
+            |ui, max_height, _| scrolling_body(ui, max_height, add_body),
+            Some(add_footer),
+        )
     }
 
+    /// Shows `preview`, painted by `paint_preview` into the rect it fills,
+    /// beside the scrolling `add_controls` on landscape screens and above them
+    /// otherwise; only the controls scroll. Use [`DialogSize::Preview`] so a
+    /// landscape screen has room for both columns.
+    pub fn show_with_preview(
+        self,
+        ctx: &egui::Context,
+        preview: DialogPreview<'_>,
+        paint_preview: impl FnOnce(&mut Ui, egui::Rect),
+        add_controls: impl FnOnce(&mut Ui),
+        add_footer: impl FnOnce(&mut Ui),
+    ) -> DialogResponse<()> {
+        let landscape =
+            ScreenLayout::from_size(ctx.content_rect().size()) == ScreenLayout::Horizontal;
+        self.show_impl(
+            ctx,
+            |ui, max_height, sheet| {
+                let scrolls = preview_body(
+                    ui,
+                    max_height,
+                    landscape && !sheet,
+                    preview,
+                    paint_preview,
+                    add_controls,
+                );
+                ((), scrolls)
+            },
+            Some(add_footer),
+        )
+    }
+
+    /// `add_body` lays out the body within the height it is given, knowing
+    /// whether the dialog is a bottom sheet, and returns its result and
+    /// whether its content scrolls.
     fn show_impl<R>(
         self,
         ctx: &egui::Context,
-        add_body: impl FnOnce(&mut Ui) -> R,
+        add_body: impl FnOnce(&mut Ui, f32, bool) -> (R, bool),
         add_footer: Option<impl FnOnce(&mut Ui)>,
     ) -> DialogResponse<R> {
         let Self {
@@ -225,12 +278,7 @@ impl Dialog {
                     - item_spacing * 2.0
                     - footer_reserve)
                     .max(metrics.control_height);
-                let body = egui::ScrollArea::vertical()
-                    .id_salt("dialog-body")
-                    .max_height(body_max_height)
-                    .auto_shrink([false, true])
-                    .show(ui, add_body);
-                let body_scrolls = body.content_size.y > body.inner_rect.height() + 0.5;
+                let (body, body_scrolls) = add_body(ui, body_max_height, placement.sheet);
 
                 if let Some(add_footer) = add_footer {
                     let (gap, _) =
@@ -261,7 +309,7 @@ impl Dialog {
                         ui.ctx().request_discard("dialog footer height changed");
                     }
                 }
-                (body.inner, closed)
+                (body, closed)
             });
 
         let (inner, closed) = modal.inner;
@@ -275,11 +323,27 @@ impl Dialog {
     }
 }
 
+/// A body that grows with its content up to `max_height`, then scrolls.
+fn scrolling_body<R>(
+    ui: &mut Ui,
+    max_height: f32,
+    add_body: impl FnOnce(&mut Ui) -> R,
+) -> (R, bool) {
+    let body = egui::ScrollArea::vertical()
+        .id_salt("dialog-body")
+        .max_height(max_height)
+        .auto_shrink([false, true])
+        .show(ui, add_body);
+    let scrolls = body.content_size.y > body.inner_rect.height() + 0.5;
+    (body.inner, scrolls)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::buttons::{primary_action_button, secondary_button};
     use crate::dialogs::{dialog_confirmation_actions, DialogAction, DialogKeyboard};
+    use crate::preview_dialog::DialogPreview;
     use crate::test_support::key_press;
 
     struct Frame {
@@ -500,6 +564,81 @@ mod tests {
             settle(&ctx, viewport, dialog, 1);
             let frame = render(&ctx, viewport, vec![key_press(key)], dialog, 1);
             assert_eq!(frame.action, expected, "{key:?}");
+        }
+    }
+
+    #[test]
+    fn area_id_finds_the_shown_dialog() {
+        let ctx = desktop();
+        let frame = settle(
+            &ctx,
+            egui::vec2(900.0, 700.0),
+            || Dialog::new("lookup", "Rename"),
+            1,
+        );
+        let area = ctx
+            .memory(|memory| memory.area_rect(Dialog::area_id("lookup")))
+            .expect("the dialog's area is known");
+        assert_eq!(area, frame.dialog);
+    }
+
+    #[test]
+    fn preview_dialogs_keep_the_preview_and_footer_in_view() {
+        for (metrics, viewport, side_by_side) in [
+            (Metrics::DESKTOP, egui::vec2(1280.0, 800.0), true),
+            (Metrics::DESKTOP, egui::vec2(1280.0, 360.0), true),
+            (Metrics::ANDROID, egui::vec2(412.0, 860.0), false),
+        ] {
+            let ctx = egui::Context::default();
+            metrics.install(&ctx);
+            let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, viewport);
+            let mut rects = None;
+            // A tall scrolling column grows into its final height over a few
+            // frames.
+            for _ in 0..12 {
+                let _ = ctx.run_ui(
+                    egui::RawInput {
+                        screen_rect: Some(screen),
+                        ..Default::default()
+                    },
+                    |root| {
+                        let mut preview = egui::Rect::NOTHING;
+                        let mut controls = egui::Rect::NOTHING;
+                        let mut footer = egui::Rect::NOTHING;
+                        let response = Dialog::new("preview", "Lens grid")
+                            .size(DialogSize::Preview)
+                            .show_with_preview(
+                                root.ctx(),
+                                DialogPreview {
+                                    label: "Grid",
+                                    aspect: 2.0 / 3.0,
+                                },
+                                |_, rect| preview = rect,
+                                |ui| {
+                                    controls = ui.label("First control").rect;
+                                    for row in 0..40 {
+                                        ui.label(format!("Control {row}"));
+                                    }
+                                },
+                                |ui| footer = secondary_button(ui, "Done").rect,
+                            );
+                        rects = Some((response.response.rect, preview, controls, footer));
+                    },
+                );
+            }
+            let (dialog, preview, controls, footer) = rects.expect("dialog renders");
+            assert!(preview.height() > 40.0, "{viewport:?}: preview {preview:?}");
+            for rect in [preview, footer] {
+                assert!(
+                    dialog.contains_rect(rect) && screen.contains_rect(rect),
+                    "{viewport:?}: {rect:?} outside dialog {dialog:?}"
+                );
+            }
+            if side_by_side {
+                assert!(preview.right() < controls.left(), "{viewport:?}");
+            } else {
+                assert!(preview.bottom() < controls.top(), "{viewport:?}");
+            }
         }
     }
 
