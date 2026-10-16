@@ -12,7 +12,7 @@ use std::ops::RangeInclusive;
 use egui::{self, Align, Layout, Sense, Stroke, Ui};
 
 use crate::buttons::interaction_visuals_for_flags;
-use crate::slider::{lock_slider_scroll, set_numeric, value_field, SliderMetrics};
+use crate::slider::{lock_slider_scroll, set_numeric, set_reset_value, value_field, SliderMetrics};
 
 /// Angle increment used while Shift is held during a drag.
 pub const SNAP_DEGREES: f32 = 15.0;
@@ -83,7 +83,7 @@ impl<'a> AngleDial<'a> {
                 |ui| {
                     let label = ui.add(egui::Label::new(self.label).sense(Sense::click()));
                     if label.double_clicked() {
-                        changed |= set_numeric(value, f64::from(reset_value), decimals);
+                        changed |= set_reset_value(value, f64::from(reset_value));
                     }
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         let (field, field_changed) = value_field(
@@ -96,7 +96,7 @@ impl<'a> AngleDial<'a> {
                         );
                         changed |= field_changed;
                         if field.double_clicked() {
-                            changed |= set_numeric(value, f64::from(reset_value), decimals);
+                            changed |= set_reset_value(value, f64::from(reset_value));
                         }
                         let options = DialOptions {
                             label: self.label,
@@ -160,7 +160,7 @@ fn dial(ui: &mut Ui, value: &mut f32, options: &DialOptions<'_>) -> egui::Respon
         response.request_focus();
     }
     if enabled && response.double_clicked() {
-        changed |= set_numeric(value, f64::from(options.reset_value), options.decimals);
+        changed |= set_reset_value(value, f64::from(options.reset_value));
     } else if enabled && (response.dragged() || response.drag_started()) {
         lock_slider_scroll(ui.ctx(), response.id);
         response.request_focus();

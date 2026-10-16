@@ -4,7 +4,8 @@
 //! do not steal scrolling, and claims the pointer once a drag is clearly
 //! horizontal. Scroll areas ask [`slider_scroll_locked`] whether a slider owns
 //! the current drag. Double-clicking the label, track or value resets to
-//! [`Slider::reset_to`], zero by default. Sliders show no tooltip: a hint
+//! [`Slider::reset_to`], zero by default, stored at full precision rather than
+//! rounded to the displayed decimals. Sliders show no tooltip: a hint
 //! must not cover a control while it is being adjusted.
 
 use std::ops::RangeInclusive;
@@ -233,7 +234,7 @@ struct TrackOptions<'a> {
 
 impl TrackOptions<'_> {
     fn reset<Num: Numeric + Copy>(&self, value: &mut Num) -> bool {
-        set_numeric(value, self.reset_value, self.decimals)
+        set_reset_value(value, self.reset_value)
     }
 }
 
@@ -706,6 +707,19 @@ fn paint_gradient_track(
     );
 }
 
+/// Stores a caller-supplied reset value exactly; returns whether it changed.
+/// Unlike [`set_numeric`] it keeps decimals the control does not display, so a
+/// reset restores a precise default such as a per-photo starting value.
+pub(crate) fn set_reset_value<Num: Numeric + Copy>(value: &mut Num, raw: f64) -> bool {
+    let next = Num::from_f64(if Num::INTEGRAL { raw.round() } else { raw });
+    if next == *value {
+        false
+    } else {
+        *value = next;
+        true
+    }
+}
+
 /// Rounds `raw` to `decimals` places and stores it; returns whether it changed.
 pub(crate) fn set_numeric<Num: Numeric + Copy>(value: &mut Num, raw: f64, decimals: usize) -> bool {
     let scale = 10_f64.powi(decimals.min(12) as i32);
@@ -969,6 +983,17 @@ mod tests {
         }
         assert!(reset_seen);
         assert_eq!(value, reset_value);
+    }
+
+    #[test]
+    fn reset_keeps_decimals_the_slider_does_not_display() {
+        let mut value = 40.0_f32;
+        let slider = Slider::new("precise-reset", &mut value, 0.0..=100.0)
+            .decimals(0)
+            .reset_to(1.18);
+        let (track, value, _) = slider.split(&egui::Context::default());
+        assert!(track.reset(value));
+        assert_eq!(*value, 1.18);
     }
 
     #[test]
