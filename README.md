@@ -18,6 +18,13 @@ metrics can be switched at runtime, and the "Enabled" toggle shows disabled
 states; Tab moves keyboard focus. `cargo test` renders it headlessly in every
 combination.
 
+## Changes in 3.3
+
+- `Slider::scale` with `SliderScale::Reciprocal`: places values along the
+  track by their reciprocal, such as a colour temperature spaced in mired
+  while it is shown and typed in kelvin. The value field, keyboard steps and
+  accessibility values keep the value's units.
+
 ## Changes in 3.2
 
 - `toggle_row`: a switch on its own full-width line, like `toggle_with_help`

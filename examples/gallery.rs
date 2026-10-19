@@ -14,7 +14,8 @@ use moduwu_design::{
     section_card_with_help, segmented_button, segmented_control, singleline_text_edit, tab_button,
     toggle, toggle_button, toggle_row, toggle_with_help, toolbar_button, toolbar_row, AngleDial,
     AnimatedImage, Design, Dialog, DialogAction, DialogKeyboard, DialogPreview, DialogSize,
-    Metrics, NumberField, Slider, SliderLayout, DIALOG_WIDTH_FORM, DIALOG_WIDTH_PREVIEW,
+    Metrics, NumberField, Slider, SliderLayout, SliderScale, DIALOG_WIDTH_FORM,
+    DIALOG_WIDTH_PREVIEW,
 };
 
 fn main() -> eframe::Result {
@@ -57,6 +58,7 @@ struct Gallery {
     exposure: f32,
     hue: f32,
     opacity: f32,
+    temperature: f32,
     angle: f32,
     choice: usize,
     /// Which `CHOICES` chips are selected.
@@ -85,6 +87,7 @@ impl Default for Gallery {
             exposure: 0.35,
             hue: 210.0,
             opacity: 80.0,
+            temperature: 5_500.0,
             angle: -30.0,
             choice: 0,
             chips: [true, false, false],
@@ -259,6 +262,12 @@ impl Gallery {
                 .show(ui);
             Slider::new("Hue", &mut self.hue, 0.0..=360.0)
                 .gradient(|t| egui::ecolor::Hsva::new(t, 0.9, 0.92, 1.0).into())
+                .layout(layout)
+                .show(ui);
+            Slider::new("Temperature", &mut self.temperature, 2_000.0..=50_000.0)
+                .scale(SliderScale::Reciprocal)
+                .step(10.0)
+                .reset_to(5_500.0)
                 .layout(layout)
                 .show(ui);
             AngleDial::new("Angle", &mut self.angle).show(ui);

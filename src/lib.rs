@@ -81,6 +81,7 @@ pub use responsive::{
 pub use scroll_into_view::{request_scroll_into_view, scroll_into_view_on_draw};
 pub use slider::{
     lock_slider_scroll, slider_scroll_locked, Slider, SliderLayout, SliderMetrics, SliderResponse,
+    SliderScale,
 };
 pub use switch::{toggle, toggle_row};
 pub use theme::{Palette, Theme, ThemeMode};

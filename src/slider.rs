@@ -6,7 +6,9 @@
 //! the current drag. Double-clicking the label, track or value resets to
 //! [`Slider::reset_to`], zero by default, stored at full precision rather than
 //! rounded to the displayed decimals. Sliders show no tooltip: a hint
-//! must not cover a control while it is being adjusted.
+//! must not cover a control while it is being adjusted. A [`SliderScale`]
+//! sets where values sit along the track; the value field, keyboard steps and
+//! accessibility values stay in the value's own units.
 
 use std::ops::RangeInclusive;
 
@@ -83,6 +85,53 @@ pub enum SliderLayout {
     Compact,
 }
 
+/// Where values sit along a [`Slider`] track.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SliderScale {
+    /// Track position proportional to the value.
+    #[default]
+    Linear,
+    /// Track position proportional to the reciprocal of the value, such as a
+    /// colour temperature placed by mired while it is shown in kelvin. Low
+    /// values stay on the left. A range that contains zero is shown linearly.
+    Reciprocal,
+}
+
+impl SliderScale {
+    /// Track coordinate of `value`, increasing with the value.
+    fn position(self, value: f64) -> f64 {
+        match self {
+            Self::Linear => value,
+            Self::Reciprocal => -1.0 / value,
+        }
+    }
+
+    /// The value at track coordinate `position`; inverse of [`Self::position`].
+    fn value(self, position: f64) -> f64 {
+        match self {
+            Self::Linear => position,
+            Self::Reciprocal => -1.0 / position,
+        }
+    }
+
+    /// Fraction of the track from `start` to `end` at which `value` sits.
+    fn fraction(self, value: f64, start: f64, end: f64) -> f64 {
+        let (start, end) = (self.position(start), self.position(end));
+        let span = end - start;
+        if span.abs() <= f64::EPSILON {
+            0.0
+        } else {
+            ((self.position(value) - start) / span).clamp(0.0, 1.0)
+        }
+    }
+
+    /// The value at `fraction` of the track from `start` to `end`.
+    fn value_at(self, fraction: f64, start: f64, end: f64) -> f64 {
+        let (start, end) = (self.position(start), self.position(end));
+        self.value(start + (end - start) * fraction)
+    }
+}
+
 /// What happened to a slider during one frame.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct SliderResponse {
@@ -104,6 +153,7 @@ pub struct Slider<'a, Num> {
     gradient: Option<Box<dyn Fn(f32) -> Color32 + 'a>>,
     metrics: Option<SliderMetrics>,
     layout: SliderLayout,
+    scale: SliderScale,
 }
 
 impl<'a, Num: Numeric + Copy> Slider<'a, Num> {
@@ -121,6 +171,7 @@ impl<'a, Num: Numeric + Copy> Slider<'a, Num> {
             gradient: None,
             metrics: None,
             layout: SliderLayout::Auto,
+            scale: SliderScale::Linear,
         }
     }
 
@@ -168,6 +219,12 @@ impl<'a, Num: Numeric + Copy> Slider<'a, Num> {
         self
     }
 
+    /// Where values sit along the track; linear by default.
+    pub fn scale(mut self, scale: SliderScale) -> Self {
+        self.scale = scale;
+        self
+    }
+
     /// Renders the labelled row and returns whether the value changed.
     pub fn show(self, ui: &mut Ui) -> bool {
         let compact = self.is_compact(ui);
@@ -209,6 +266,10 @@ impl<'a, Num: Numeric + Copy> Slider<'a, Num> {
     fn split(self, ctx: &egui::Context) -> (TrackOptions<'a>, &'a mut Num, RangeInclusive<Num>) {
         let start = self.range.start().to_f64();
         let end = self.range.end().to_f64();
+        let scale = match self.scale {
+            SliderScale::Reciprocal if start * end <= 0.0 => SliderScale::Linear,
+            scale => scale,
+        };
         let options = TrackOptions {
             label: self.label,
             decimals: self.decimals,
@@ -217,6 +278,7 @@ impl<'a, Num: Numeric + Copy> Slider<'a, Num> {
             accent: self.accent,
             gradient: self.gradient,
             metrics: self.metrics.unwrap_or_else(|| SliderMetrics::of(ctx)),
+            scale,
         };
         (options, self.value, self.range)
     }
@@ -230,6 +292,7 @@ struct TrackOptions<'a> {
     accent: Option<Color32>,
     gradient: Option<Box<dyn Fn(f32) -> Color32 + 'a>>,
     metrics: SliderMetrics,
+    scale: SliderScale,
 }
 
 impl TrackOptions<'_> {
@@ -446,11 +509,8 @@ fn track_widget<Num: Numeric + Copy>(
     let start = range.start().to_f64();
     let end = range.end().to_f64();
     let span = end - start;
-    let fraction = if span.abs() <= f64::EPSILON {
-        0.0
-    } else {
-        ((value.to_f64() - start) / span).clamp(0.0, 1.0)
-    } as f32;
+    let scale = options.scale;
+    let fraction = scale.fraction(value.to_f64(), start, end) as f32;
 
     let row_height = if compact {
         metrics.header_height
@@ -519,7 +579,8 @@ fn track_widget<Num: Numeric + Copy>(
         if let (Some(origin), Some(position), true) = (press_origin, pointer_pos, pointer_down) {
             if drag_active {
                 lock_slider_scroll(ui.ctx(), drag_id);
-                changed |= set_from_pointer(value, start, end, decimals, track_rect, position.x);
+                changed |=
+                    set_from_pointer(value, scale, start, end, decimals, track_rect, position.x);
             } else if rect.contains(origin) && owns_pointer {
                 let delta = position - origin;
                 let threshold = if handle_hit_rect.contains(origin) {
@@ -533,8 +594,9 @@ fn track_widget<Num: Numeric + Copy>(
                     drag_active = true;
                     lock_slider_scroll(ui.ctx(), drag_id);
                     track_response.request_focus();
-                    changed |=
-                        set_from_pointer(value, start, end, decimals, track_rect, position.x);
+                    changed |= set_from_pointer(
+                        value, scale, start, end, decimals, track_rect, position.x,
+                    );
                 }
             }
         }
@@ -617,6 +679,7 @@ fn track_widget<Num: Numeric + Copy>(
             ui.visuals().widgets.inactive.bg_fill,
         );
     }
+    // Only a linear range can contain zero (see `Slider::split`).
     let bipolar = start < 0.0 && end > 0.0;
     let fill_origin = if bipolar {
         let zero_fraction = ((-start) / span).clamp(0.0, 1.0) as f32;
@@ -667,6 +730,7 @@ fn track_widget<Num: Numeric + Copy>(
 
 fn set_from_pointer<Num: Numeric + Copy>(
     value: &mut Num,
+    scale: SliderScale,
     start: f64,
     end: f64,
     decimals: usize,
@@ -674,7 +738,9 @@ fn set_from_pointer<Num: Numeric + Copy>(
     pointer_x: f32,
 ) -> bool {
     let fraction = ((pointer_x - track_rect.left()) / track_rect.width().max(1.0)).clamp(0.0, 1.0);
-    set_numeric(value, start + (end - start) * f64::from(fraction), decimals)
+    let raw = scale.value_at(f64::from(fraction), start, end);
+    // The reciprocal mapping can land a hair outside the range at its ends.
+    set_numeric(value, raw.clamp(start.min(end), start.max(end)), decimals)
 }
 
 fn paint_gradient_track(
@@ -1004,6 +1070,49 @@ mod tests {
         let (track, value, _) = slider.split(&egui::Context::default());
         assert!(track.reset(value));
         assert_eq!(*value, 1);
+    }
+
+    #[test]
+    fn reciprocal_scale_places_values_by_their_reciprocal() {
+        let scale = SliderScale::Reciprocal;
+        let midpoint = 2.0 / (1.0 / 2_000.0 + 1.0 / 20_000.0);
+        assert!((scale.fraction(midpoint, 2_000.0, 20_000.0) - 0.5).abs() < 1e-12);
+        assert!((scale.value_at(0.5, 2_000.0, 20_000.0) - midpoint).abs() < 1e-9);
+        assert_eq!(scale.fraction(2_000.0, 2_000.0, 20_000.0), 0.0);
+        assert_eq!(scale.fraction(20_000.0, 2_000.0, 20_000.0), 1.0);
+        assert_eq!(
+            SliderScale::Linear.fraction(5_000.0, 2_000.0, 20_000.0),
+            3_000.0 / 18_000.0
+        );
+    }
+
+    #[test]
+    fn dragging_a_reciprocal_slider_to_the_middle_selects_the_reciprocal_midpoint() {
+        let ctx = egui::Context::default();
+        let mut value = 20_000.0_f32;
+        let mut time = 0.0;
+        let mut show = |events| {
+            time += 0.05;
+            let _ = ctx.run_ui(input(time, events), |ui| {
+                ui.set_width(400.0);
+                Slider::new("Temperature", &mut value, 2_000.0..=20_000.0)
+                    .scale(SliderScale::Reciprocal)
+                    .layout(SliderLayout::Stacked)
+                    .show(ui);
+            });
+        };
+        show(Vec::new());
+        let handle = pos2(400.0 - METRICS.handle_radius, TRACK_Y);
+        show(drag(handle, pos2(200.0, TRACK_Y)));
+        assert_eq!(value, 3_636.0);
+    }
+
+    #[test]
+    fn reciprocal_scale_over_zero_falls_back_to_linear() {
+        let mut value = 0.5_f32;
+        let slider = Slider::new("bipolar", &mut value, -1.0..=1.0).scale(SliderScale::Reciprocal);
+        let (track, _, _) = slider.split(&egui::Context::default());
+        assert_eq!(track.scale, SliderScale::Linear);
     }
 
     #[test]
