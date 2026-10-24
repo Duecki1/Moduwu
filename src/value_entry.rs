@@ -1,7 +1,8 @@
 //! Typing an exact value on touch screens. The value readout of a
 //! [`crate::Slider`] or [`crate::AngleDial`] cannot be edited in place there,
 //! because the on-screen keyboard would cover the control, so a tap opens a
-//! [`Dialog`] with a text field instead.
+//! [`Dialog`] with a text field instead, and asks for the keyboard's number
+//! layout while it is open.
 
 use egui::emath::Numeric;
 use egui::text::{CCursor, CCursorRange};
@@ -13,6 +14,7 @@ use crate::dialogs::{
     dialog_confirmation_actions, dialog_text_field, request_initial_focus, DialogAction,
     DialogKeyboard,
 };
+use crate::keyboard::request_numeric_keyboard;
 use crate::modal_dialog::Dialog;
 use crate::slider::set_numeric;
 
@@ -77,6 +79,7 @@ pub(crate) fn touch_value_entry<Num: Numeric + Copy>(
         focus_requested,
     }) = &mut entry
     {
+        request_numeric_keyboard(ctx);
         let (min, max) = {
             let (start, end) = (range.start().to_f64(), range.end().to_f64());
             (start.min(end), start.max(end))

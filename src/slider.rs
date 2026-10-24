@@ -1493,6 +1493,7 @@ mod tests {
     fn tapping_the_touch_readout_opens_a_dialog_that_sets_the_typed_value() {
         let mut harness = Harness::touch();
         harness.open_value_entry();
+        assert!(crate::numeric_keyboard_requested(&harness.ctx));
         // The shown value is selected, so typing replaces it.
         harness.frame(vec![Event::Text("12".into())]);
         assert_eq!(harness.value, 50, "typing alone does not apply the value");
@@ -1500,6 +1501,8 @@ mod tests {
         assert_eq!(harness.value, 12);
         harness.frame(Vec::new());
         assert!(!harness.modal_open());
+        harness.frame(Vec::new());
+        assert!(!crate::numeric_keyboard_requested(&harness.ctx));
     }
 
     #[test]

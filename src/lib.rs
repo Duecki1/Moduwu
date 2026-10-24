@@ -63,7 +63,9 @@ pub use frames::{
     tool_rail_icon_size, toolbar_frame, toolbar_icon_size, toolbar_row, toolbar_title,
     workspace_frame, Card,
 };
-pub use keyboard::{keyboard_inset, set_keyboard_inset, unobscured_content_rect};
+pub use keyboard::{
+    keyboard_inset, numeric_keyboard_requested, set_keyboard_inset, unobscured_content_rect,
+};
 pub use menus::{
     context_menu, context_menu_item, destructive_menu_item, dropdown_menu, dropdown_submenu,
     menu_checkbox_item, menu_item, overflow_menu,
