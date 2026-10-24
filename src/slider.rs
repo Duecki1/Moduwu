@@ -3,13 +3,19 @@
 //! The track ignores mostly vertical drags so that sliders inside scroll areas
 //! do not steal scrolling, and claims the pointer once a drag is clearly
 //! horizontal. Scroll areas ask [`slider_scroll_locked`] whether a slider owns
-//! the current drag. Double-clicking the label, track or value resets to
+//! the current drag. With a mouse the handle follows the pointer. On touch
+//! screens a drag moves the value by the finger's travel from wherever the
+//! drag started, so grabbing the slider never moves the value. Moving the
+//! finger away from the track while dragging slows the value for fine
+//! adjustment, and the small shift of a lifting finger is discarded.
+//! Double-clicking the label, track or value resets to
 //! [`Slider::reset_to`], zero by default, stored at full precision rather than
 //! rounded to the displayed decimals. Sliders show no tooltip: a hint
 //! must not cover a control while it is being adjusted. A [`SliderScale`]
 //! sets where values sit along the track; the value field, keyboard steps and
 //! accessibility values stay in the value's own units.
 
+use std::collections::VecDeque;
 use std::ops::RangeInclusive;
 
 use egui::{self, emath::Numeric, Align, Align2, Color32, Layout, RichText, Sense, Stroke, Ui};
@@ -24,6 +30,15 @@ const HANDLE_DRAG_THRESHOLD: f32 = 2.0;
 /// Horizontal movement must exceed vertical movement by this factor before a
 /// drag that began on the track moves the value.
 const HORIZONTAL_INTENT_RATIO: f32 = 1.15;
+/// Points beyond the track row at which a touch drag moves the value at half
+/// speed; at three times this distance it moves at a quarter.
+const FINE_TUNE_DISTANCE: f32 = 60.0;
+/// Seconds before a touch is released during which a small movement counts as
+/// the finger rolling off the screen rather than an adjustment.
+const LIFT_OFF_WINDOW: f64 = 0.08;
+/// Largest horizontal movement in points within [`LIFT_OFF_WINDOW`] that is
+/// discarded on release.
+const LIFT_OFF_SLOP: f32 = 4.0;
 const COMPACT_ROW_GAP: f32 = 4.0;
 const COMPACT_ROW_BOTTOM_SPACE: f32 = 1.0;
 const COMPACT_LABEL_MIN_WIDTH: f32 = 76.0;
@@ -573,14 +588,55 @@ fn track_widget<Num: Numeric + Copy>(
         (None, None, false)
     };
     let mut drag_active = pointer_down && scroll_lock_owner(ui.ctx()) == Some(drag_id);
+    let (touch, now, released) = ui.input(|input| {
+        (
+            input.has_touch_screen(),
+            input.time,
+            input.pointer.any_released(),
+        )
+    });
+    let touch_drag_id = drag_id.with("touch");
+    let mut touch_drag = ui.ctx().data_mut(|data| {
+        let touch_drag = data.get_temp::<TouchDrag>(touch_drag_id);
+        data.remove::<TouchDrag>(touch_drag_id);
+        touch_drag
+    });
+    if !drag_active {
+        // A touch drag of this slider ended this frame or earlier; only one
+        // released this frame may still settle the value.
+        if let (Some(touch_drag), Some(position)) = (touch_drag.take(), pointer_pos) {
+            let settled = touch_drag.settled_fraction(position.x, now);
+            if let Some(settled) = settled.filter(|_| released && !pointer_down && !reset_requested)
+            {
+                changed |= set_from_fraction(value, scale, start, end, decimals, settled);
+            }
+        }
+    }
     let owns_pointer =
         enabled && (track_response.contains_pointer() || handle_response.contains_pointer());
     if enabled && !reset_requested {
         if let (Some(origin), Some(position), true) = (press_origin, pointer_pos, pointer_down) {
             if drag_active {
                 lock_slider_scroll(ui.ctx(), drag_id);
-                changed |=
-                    set_from_pointer(value, scale, start, end, decimals, track_rect, position.x);
+                if touch {
+                    let touch_drag = touch_drag.get_or_insert_with(|| {
+                        TouchDrag::start(scale.fraction(value.to_f64(), start, end), position, now)
+                    });
+                    if touch_drag.follow(position, now, rect, track_rect.width()) {
+                        changed |= set_from_fraction(
+                            value,
+                            scale,
+                            start,
+                            end,
+                            decimals,
+                            touch_drag.fraction,
+                        );
+                    }
+                } else {
+                    changed |= set_from_pointer(
+                        value, scale, start, end, decimals, track_rect, position.x,
+                    );
+                }
             } else if rect.contains(origin) && owns_pointer {
                 let delta = position - origin;
                 let threshold = if handle_hit_rect.contains(origin) {
@@ -594,12 +650,26 @@ fn track_widget<Num: Numeric + Copy>(
                     drag_active = true;
                     lock_slider_scroll(ui.ctx(), drag_id);
                     track_response.request_focus();
-                    changed |= set_from_pointer(
-                        value, scale, start, end, decimals, track_rect, position.x,
-                    );
+                    if touch {
+                        // Movement before the drag was recognised is not
+                        // applied, so claiming the drag never moves the value.
+                        touch_drag = Some(TouchDrag::start(
+                            scale.fraction(value.to_f64(), start, end),
+                            position,
+                            now,
+                        ));
+                    } else {
+                        changed |= set_from_pointer(
+                            value, scale, start, end, decimals, track_rect, position.x,
+                        );
+                    }
                 }
             }
         }
+    }
+    if let Some(touch_drag) = touch_drag.filter(|_| drag_active) {
+        ui.ctx()
+            .data_mut(|data| data.insert_temp(touch_drag_id, touch_drag));
     }
 
     let focused = track_response.has_focus() || handle_response.has_focus();
@@ -738,9 +808,105 @@ fn set_from_pointer<Num: Numeric + Copy>(
     pointer_x: f32,
 ) -> bool {
     let fraction = ((pointer_x - track_rect.left()) / track_rect.width().max(1.0)).clamp(0.0, 1.0);
-    let raw = scale.value_at(f64::from(fraction), start, end);
+    set_from_fraction(value, scale, start, end, decimals, f64::from(fraction))
+}
+
+/// Sets the value at `fraction` of the track; returns whether it changed.
+fn set_from_fraction<Num: Numeric + Copy>(
+    value: &mut Num,
+    scale: SliderScale,
+    start: f64,
+    end: f64,
+    decimals: usize,
+    fraction: f64,
+) -> bool {
+    let raw = scale.value_at(fraction, start, end);
     // The reciprocal mapping can land a hair outside the range at its ends.
     set_numeric(value, raw.clamp(start.min(end), start.max(end)), decimals)
+}
+
+/// A finger's position on the track at one frame of a [`TouchDrag`].
+#[derive(Clone, Copy, Debug)]
+struct TouchSample {
+    /// Input time in seconds.
+    time: f64,
+    fraction: f64,
+    pointer_x: f32,
+}
+
+/// A touch drag in progress. It moves the value relative to where the drag
+/// started instead of putting it under the finger, which a fingertip covers
+/// and cannot place precisely.
+#[derive(Clone, Debug)]
+struct TouchDrag {
+    /// Track fraction of the value, unrounded so that movements smaller than
+    /// one displayed step still add up.
+    fraction: f64,
+    last_x: f32,
+    /// Recent samples, oldest first. The first is the newest one at least
+    /// [`LIFT_OFF_WINDOW`] old, the state a release can return to.
+    samples: VecDeque<TouchSample>,
+}
+
+impl TouchDrag {
+    fn start(fraction: f64, pointer: egui::Pos2, time: f64) -> Self {
+        let mut drag = Self {
+            fraction,
+            last_x: pointer.x,
+            samples: VecDeque::new(),
+        };
+        drag.record(time);
+        drag
+    }
+
+    /// Moves by the finger's horizontal travel since the last frame, scaled
+    /// down with its distance beyond `row`; returns whether the fraction moved.
+    fn follow(
+        &mut self,
+        pointer: egui::Pos2,
+        time: f64,
+        row: egui::Rect,
+        track_width: f32,
+    ) -> bool {
+        let beyond_row = ((pointer.y - row.center().y).abs() - row.height() * 0.5).max(0.0);
+        let gain = 1.0 / (1.0 + beyond_row / FINE_TUNE_DISTANCE);
+        let travel = (pointer.x - self.last_x) * gain / track_width.max(1.0);
+        self.last_x = pointer.x;
+        let previous = self.fraction;
+        self.fraction = (self.fraction + f64::from(travel)).clamp(0.0, 1.0);
+        self.record(time);
+        self.fraction != previous
+    }
+
+    fn record(&mut self, time: f64) {
+        self.samples.push_back(TouchSample {
+            time,
+            fraction: self.fraction,
+            pointer_x: self.last_x,
+        });
+        self.trim(time);
+    }
+
+    /// Drops samples older than needed for a release at `time`.
+    fn trim(&mut self, time: f64) {
+        while self
+            .samples
+            .get(1)
+            .is_some_and(|next| next.time <= time - LIFT_OFF_WINDOW)
+        {
+            self.samples.pop_front();
+        }
+    }
+
+    /// The fraction to keep for a release at `pointer_x` and `time`, when it
+    /// differs from the current one: the fraction from before the finger
+    /// rolled off if it moved less than [`LIFT_OFF_SLOP`] meanwhile.
+    fn settled_fraction(mut self, pointer_x: f32, time: f64) -> Option<f64> {
+        self.trim(time);
+        let before = self.samples.front()?;
+        ((pointer_x - before.pointer_x).abs() <= LIFT_OFF_SLOP && before.fraction != self.fraction)
+            .then_some(before.fraction)
+    }
 }
 
 fn paint_gradient_track(
@@ -935,6 +1101,43 @@ mod tests {
                 self.frame(vec![Event::PointerMoved(pos), press(pos, pressed)]);
             }
         }
+
+        /// A harness whose input has seen a touch screen, away from the slider.
+        fn touch() -> Self {
+            let mut harness = Self::new();
+            let touch = |phase| Event::Touch {
+                device_id: egui::TouchDeviceId(1),
+                id: egui::TouchId(1),
+                phase,
+                pos: pos2(390.0, 230.0),
+                force: None,
+            };
+            harness.frame(vec![
+                touch(egui::TouchPhase::Start),
+                touch(egui::TouchPhase::End),
+            ]);
+            harness
+        }
+
+        fn move_to(&mut self, pos: egui::Pos2) {
+            self.frame(vec![Event::PointerMoved(pos)]);
+        }
+
+        fn release(&mut self, pos: egui::Pos2) {
+            self.frame(vec![Event::PointerMoved(pos), press(pos, false)]);
+        }
+    }
+
+    /// Track width of the harness slider and the x of its handle at 50.
+    fn harness_track() -> (f32, f32) {
+        let width = 400.0 - METRICS.handle_radius * 2.0;
+        (width, METRICS.handle_radius + width * 49.0 / 99.0)
+    }
+
+    /// The harness value after moving `points` along its track from 50.
+    fn harness_value_after(points: f32) -> u8 {
+        let (width, _) = harness_track();
+        (50.0 + points / width * 99.0).round() as u8
     }
 
     #[test]
@@ -1158,6 +1361,89 @@ mod tests {
         harness.frame(vec![press(pos2(300.0, TRACK_Y), false)]);
         harness.frame(drag(pos2(100.0, 160.0), pos2(300.0, 160.0)));
         assert_eq!(harness.value, dragged);
+    }
+
+    #[test]
+    fn touch_drag_moves_the_value_by_the_finger_travel_not_to_the_finger() {
+        let mut harness = Harness::touch();
+        harness.frame(drag(pos2(100.0, TRACK_Y), pos2(110.0, TRACK_Y)));
+        assert_eq!(
+            harness.value, 50,
+            "claiming the drag must not move the value"
+        );
+        assert!(slider_scroll_locked(&harness.ctx));
+
+        harness.move_to(pos2(150.0, TRACK_Y));
+        assert_eq!(harness.value, harness_value_after(40.0));
+    }
+
+    #[test]
+    fn grabbing_the_handle_off_centre_by_touch_keeps_the_value() {
+        let mut harness = Harness::touch();
+        let (_, handle_x) = harness_track();
+        let grab = pos2(handle_x + 12.0, TRACK_Y);
+        harness.frame(drag(grab, grab + egui::vec2(3.0, 0.0)));
+        assert_eq!(harness.value, 50);
+    }
+
+    #[test]
+    fn touch_drag_away_from_the_track_moves_the_value_more_slowly() {
+        for (beyond_row, gain) in [(0.0, 1.0), (FINE_TUNE_DISTANCE * 2.0, 1.0 / 3.0)] {
+            let mut harness = Harness::touch();
+            harness.frame(drag(pos2(100.0, TRACK_Y), pos2(110.0, TRACK_Y)));
+            let y = TRACK_Y + METRICS.track_row_height * 0.5 + beyond_row;
+            // Moving away from the track alone keeps the value.
+            harness.move_to(pos2(110.0, y));
+            assert_eq!(harness.value, 50);
+            harness.move_to(pos2(170.0, y));
+            assert_eq!(
+                harness.value,
+                harness_value_after(60.0 * gain),
+                "{beyond_row}"
+            );
+        }
+    }
+
+    #[test]
+    fn touch_release_discards_the_shift_of_a_lifting_finger() {
+        let mut harness = Harness::touch();
+        harness.frame(drag(pos2(100.0, TRACK_Y), pos2(110.0, TRACK_Y)));
+        harness.move_to(pos2(150.0, TRACK_Y));
+        let set = harness.value;
+        // The finger rolls 3 points within the last two frames before lifting.
+        harness.move_to(pos2(152.0, TRACK_Y));
+        assert_ne!(harness.value, set);
+        harness.release(pos2(153.0, TRACK_Y));
+        assert_eq!(harness.value, set);
+        assert!(!slider_scroll_locked(&harness.ctx));
+    }
+
+    #[test]
+    fn touch_release_keeps_a_deliberate_final_movement() {
+        let mut harness = Harness::touch();
+        harness.frame(drag(pos2(100.0, TRACK_Y), pos2(110.0, TRACK_Y)));
+        harness.move_to(pos2(150.0, TRACK_Y));
+        harness.move_to(pos2(180.0, TRACK_Y));
+        let moved = harness.value;
+        assert_eq!(moved, harness_value_after(70.0));
+        harness.release(pos2(180.0, TRACK_Y));
+        assert_eq!(harness.value, moved);
+    }
+
+    #[test]
+    fn touch_release_without_movement_keeps_the_value_after_a_later_press() {
+        // A finished touch drag must not settle the value again on a later
+        // release elsewhere.
+        let mut harness = Harness::touch();
+        harness.frame(drag(pos2(100.0, TRACK_Y), pos2(110.0, TRACK_Y)));
+        harness.move_to(pos2(150.0, TRACK_Y));
+        harness.frame(Vec::new());
+        harness.frame(Vec::new());
+        harness.release(pos2(150.0, TRACK_Y));
+        let set = harness.value;
+        assert_eq!(set, harness_value_after(40.0));
+        harness.click(pos2(200.0, 160.0));
+        assert_eq!(harness.value, set);
     }
 
     #[test]
