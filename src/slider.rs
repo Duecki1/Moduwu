@@ -24,6 +24,7 @@ use crate::buttons::interaction_visuals_for_flags;
 use crate::metrics::Metrics;
 use crate::number_field::NumberField;
 use crate::responsive::is_compact_portrait;
+use crate::value_entry::touch_value_entry;
 
 const TRACK_DRAG_THRESHOLD: f32 = 8.0;
 const HANDLE_DRAG_THRESHOLD: f32 = 2.0;
@@ -338,8 +339,15 @@ fn compact_row<Num: Numeric + Copy>(
 
             changed |= track_widget(ui, track, value, range.clone(), track_width, true).changed;
 
-            let (value_response, value_changed) =
-                value_field(ui, value, range, track.decimals, track.step, metrics);
+            let (value_response, value_changed) = value_field(
+                ui,
+                track.label,
+                value,
+                range,
+                track.decimals,
+                track.step,
+                metrics,
+            );
             changed |= value_changed;
             if value_response.double_clicked() {
                 changed |= track.reset(value);
@@ -382,6 +390,7 @@ fn stacked_rows<Num: Numeric + Copy>(
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 let (value_response, value_changed) = value_field(
                     ui,
+                    track.label,
                     value,
                     range.clone(),
                     track.decimals,
@@ -452,10 +461,12 @@ fn compact_label(
     response
 }
 
-/// An editable [`NumberField`], or a read-only readout on touch screens where
-/// a keyboard would cover the slider.
+/// An editable [`NumberField`], or on touch screens, where a keyboard would
+/// cover the control, a readout that opens a dialog to type the value of the
+/// control `label`.
 pub(crate) fn value_field<Num: Numeric + Copy>(
     ui: &mut Ui,
+    label: &str,
     value: &mut Num,
     range: RangeInclusive<Num>,
     decimals: usize,
@@ -464,10 +475,9 @@ pub(crate) fn value_field<Num: Numeric + Copy>(
 ) -> (egui::Response, bool) {
     let size = egui::vec2(metrics.value_field_width, metrics.header_height);
     if ui.input(|input| input.has_touch_screen()) {
-        return (
-            touch_value_readout(ui, value.to_f64(), decimals, size),
-            false,
-        );
+        let readout = touch_value_readout(ui, label, value.to_f64(), decimals, size);
+        let changed = touch_value_entry(ui, &readout, label, value, range, decimals);
+        return (readout, changed);
     }
     ui.allocate_ui_with_layout(
         size,
@@ -487,11 +497,19 @@ pub(crate) fn value_field<Num: Numeric + Copy>(
 
 fn touch_value_readout(
     ui: &mut Ui,
+    label: &str,
     value: f64,
     decimals: usize,
     size: egui::Vec2,
 ) -> egui::Response {
     let (rect, response) = ui.allocate_exact_size(size, Sense::click());
+    response.widget_info(|| {
+        egui::WidgetInfo::labeled(
+            egui::WidgetType::Button,
+            ui.is_enabled(),
+            format!("Type {label}"),
+        )
+    });
     let visuals = ui.style().interact(&response);
     let painter = ui.painter_at(rect);
     painter.rect_filled(rect, visuals.corner_radius, visuals.bg_fill);
@@ -1444,6 +1462,76 @@ mod tests {
         assert_eq!(set, harness_value_after(40.0));
         harness.click(pos2(200.0, 160.0));
         assert_eq!(harness.value, set);
+    }
+
+    /// Centre of the harness slider's value readout.
+    const READOUT: egui::Pos2 = pos2(
+        400.0 - METRICS.value_field_width * 0.5,
+        METRICS.header_height * 0.5,
+    );
+
+    impl Harness {
+        fn modal_open(&self) -> bool {
+            !self
+                .ctx
+                .memory(|memory| memory.allows_interaction(egui::LayerId::background()))
+        }
+
+        /// Taps the readout and waits until it can no longer be a double tap.
+        fn open_value_entry(&mut self) {
+            self.click(READOUT);
+            assert!(
+                !self.modal_open(),
+                "the dialog waits for a possible double tap"
+            );
+            self.rest(READOUT, 0.4);
+            assert!(self.modal_open());
+        }
+    }
+
+    #[test]
+    fn tapping_the_touch_readout_opens_a_dialog_that_sets_the_typed_value() {
+        let mut harness = Harness::touch();
+        harness.open_value_entry();
+        // The shown value is selected, so typing replaces it.
+        harness.frame(vec![Event::Text("12".into())]);
+        assert_eq!(harness.value, 50, "typing alone does not apply the value");
+        harness.frame(vec![key(Key::Enter, true)]);
+        assert_eq!(harness.value, 12);
+        harness.frame(Vec::new());
+        assert!(!harness.modal_open());
+    }
+
+    #[test]
+    fn double_tapping_the_touch_readout_resets_without_opening_the_dialog() {
+        let mut harness = Harness::touch();
+        harness.click(READOUT);
+        harness.click(READOUT);
+        assert_eq!(harness.value, 1, "the reset value is clamped to the range");
+        harness.rest(READOUT, 0.4);
+        assert!(!harness.modal_open());
+    }
+
+    #[test]
+    fn an_out_of_range_value_cannot_be_set_and_cancelling_keeps_the_value() {
+        let mut harness = Harness::touch();
+        harness.open_value_entry();
+        harness.frame(vec![Event::Text("250".into())]);
+        harness.frame(vec![key(Key::Enter, true)]);
+        assert_eq!(harness.value, 50);
+        assert!(harness.modal_open());
+        harness.frame(vec![key(Key::Escape, true)]);
+        harness.frame(Vec::new());
+        assert_eq!(harness.value, 50);
+        assert!(!harness.modal_open());
+    }
+
+    #[test]
+    fn without_a_touch_screen_the_value_field_is_edited_in_place() {
+        let mut harness = Harness::new();
+        harness.click(READOUT);
+        harness.rest(READOUT, 0.4);
+        assert!(!harness.modal_open());
     }
 
     #[test]

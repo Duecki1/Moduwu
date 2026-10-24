@@ -88,6 +88,7 @@ impl<'a> AngleDial<'a> {
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         let (field, field_changed) = value_field(
                             ui,
+                            self.label,
                             value,
                             min..=max,
                             decimals,

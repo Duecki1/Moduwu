@@ -5,7 +5,8 @@
 //! controls, switches, segmented controls and chips, popup helpers, dialogs
 //! (modal ones, and one that pairs an image preview with its controls), short
 //! animated clips, and responsive layout utilities, including scrolling a
-//! newly revealed widget into view.
+//! newly revealed widget into view and keeping dialogs above an on-screen
+//! keyboard.
 //! Applications are expected to keep their own theme selection, persistence,
 //! domain widgets, and business logic outside this crate.
 
@@ -16,6 +17,7 @@ mod choices;
 mod dialogs;
 mod forms;
 mod frames;
+mod keyboard;
 mod menus;
 mod metrics;
 mod modal_dialog;
@@ -30,6 +32,7 @@ mod switch;
 mod test_support;
 mod theme;
 mod tooltip;
+mod value_entry;
 
 pub use angle_dial::{AngleDial, SNAP_DEGREES};
 pub use animated_image::{AnimatedImage, AnimatedImageError};
@@ -60,6 +63,7 @@ pub use frames::{
     tool_rail_icon_size, toolbar_frame, toolbar_icon_size, toolbar_row, toolbar_title,
     workspace_frame, Card,
 };
+pub use keyboard::{keyboard_inset, set_keyboard_inset, unobscured_content_rect};
 pub use menus::{
     context_menu, context_menu_item, destructive_menu_item, dropdown_menu, dropdown_submenu,
     menu_checkbox_item, menu_item, overflow_menu,

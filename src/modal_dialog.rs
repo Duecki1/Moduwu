@@ -5,6 +5,7 @@ use egui::{self, Align, Align2, Color32, CornerRadius, Layout, Response, RichTex
 
 use crate::buttons::ghost_icon_button;
 use crate::dialogs::{close_popups_on_escape, DIALOG_VIEWPORT_PADDING, DIALOG_WIDTH_PREVIEW};
+use crate::keyboard::unobscured_content_rect;
 use crate::metrics::{Metrics, SPACE_SM};
 use crate::preview_dialog::{preview_body, DialogPreview};
 use crate::responsive::ScreenLayout;
@@ -66,7 +67,8 @@ impl Placement {
 
 /// A modal dialog. The backdrop dims and blocks the rest of the UI; on narrow
 /// viewports and touch layouts in portrait the dialog becomes a bottom sheet
-/// whose footer actions span its width.
+/// whose footer actions span its width. The dialog sits above the on-screen
+/// keyboard reported with [`crate::set_keyboard_inset`].
 ///
 /// The dialog is shown for as long as the caller calls [`Dialog::show`] or
 /// [`Dialog::show_with_footer`] each frame. Keyboard handling stays with the
@@ -205,7 +207,10 @@ impl Dialog {
         } = self;
         close_popups_on_escape(ctx);
         let metrics = Metrics::of(ctx);
-        let placement = Placement::for_viewport(ctx.content_rect(), metrics, size);
+        // Stay above an on-screen keyboard so the focused field and the footer
+        // actions remain visible while typing.
+        let viewport = unobscured_content_rect(ctx);
+        let placement = Placement::for_viewport(viewport, metrics, size);
         let style = ctx.global_style();
         let mut frame = egui::Frame::window(&style);
         let anchor = if placement.sheet {
@@ -228,7 +233,11 @@ impl Dialog {
         let footer_height_id = id.with("footer-height");
 
         let modal = egui::Modal::new(id)
-            .area(egui::Modal::default_area(id).anchor(anchor, egui::Vec2::ZERO))
+            .area(
+                egui::Modal::default_area(id)
+                    .anchor(anchor, egui::Vec2::ZERO)
+                    .constrain_to(viewport),
+            )
             .frame(frame)
             .backdrop_color(backdrop)
             .show(ctx, |ui| {
@@ -462,6 +471,39 @@ mod tests {
                 footer.width() > viewport.x * 0.8,
                 "stacked actions span the sheet: {footer:?}"
             );
+        }
+    }
+
+    #[test]
+    fn dialogs_stay_above_the_on_screen_keyboard() {
+        for (viewport, keyboard, rows) in [
+            // A portrait bottom sheet rises with the keyboard.
+            (egui::vec2(412.0, 860.0), 320.0, 1),
+            // A centred landscape dialog shrinks and scrolls into what is left.
+            (egui::vec2(900.0, 412.0), 220.0, 40),
+        ] {
+            let ctx = egui::Context::default();
+            Metrics::ANDROID.install(&ctx);
+            crate::set_keyboard_inset(&ctx, keyboard);
+            let frame = settle(&ctx, viewport, || Dialog::new("keyboard", "Rename"), rows);
+            let visible_bottom = viewport.y - keyboard;
+            assert!(
+                frame.dialog.bottom() <= visible_bottom + 0.5 && frame.dialog.top() >= -0.5,
+                "{viewport:?}: {:?}",
+                frame.dialog
+            );
+            let footer = frame.footer.expect("footer renders");
+            assert!(
+                footer.bottom() <= visible_bottom,
+                "{viewport:?}: {footer:?}"
+            );
+            if rows == 1 {
+                assert!(
+                    (frame.dialog.bottom() - visible_bottom).abs() < 1.0,
+                    "the sheet sits on the keyboard: {:?}",
+                    frame.dialog
+                );
+            }
         }
     }
 
