@@ -14,6 +14,7 @@ use crate::dialogs::{
     dialog_confirmation_actions, dialog_text_field, request_initial_focus, DialogAction,
     DialogKeyboard,
 };
+use crate::double_tap::{double_tapped, DOUBLE_TAP_DELAY};
 use crate::keyboard::request_numeric_keyboard;
 use crate::modal_dialog::Dialog;
 use crate::slider::set_numeric;
@@ -50,26 +51,25 @@ pub(crate) fn touch_value_entry<Num: Numeric + Copy>(
     let id = readout.id.with("value-entry");
     let frame = ctx.cumulative_frame_nr();
     let now = ui.input(|input| input.time);
-    let double_click_delay = ctx.options(|options| options.input_options.max_double_click_delay);
     let mut entry = ctx
         .data(|data| data.get_temp::<ValueEntry>(id))
         .filter(|entry| entry.frame + 1 >= frame)
         .map(|entry| entry.stage);
 
-    if readout.double_clicked() {
+    if double_tapped(readout) {
         entry = None;
     } else if readout.clicked() && entry.is_none() {
         entry = Some(Stage::Tapped { at: now });
     }
     if let Some(Stage::Tapped { at }) = entry {
         let waited = now - at;
-        if waited >= double_click_delay {
+        if waited >= DOUBLE_TAP_DELAY {
             entry = Some(Stage::Editing {
                 text: format!("{:.decimals$}", value.to_f64()),
                 focus_requested: false,
             });
         } else {
-            ctx.request_repaint_after_secs((double_click_delay - waited) as f32);
+            ctx.request_repaint_after_secs((DOUBLE_TAP_DELAY - waited) as f32);
         }
     }
 

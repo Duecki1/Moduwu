@@ -21,6 +21,7 @@ use std::ops::RangeInclusive;
 use egui::{self, emath::Numeric, Align, Align2, Color32, Layout, RichText, Sense, Stroke, Ui};
 
 use crate::buttons::interaction_visuals_for_flags;
+use crate::double_tap::{double_tapped, double_tapped_on};
 use crate::metrics::Metrics;
 use crate::number_field::NumberField;
 use crate::responsive::is_compact_portrait;
@@ -333,7 +334,7 @@ fn compact_row<Num: Numeric + Copy>(
         |ui| {
             ui.spacing_mut().item_spacing.x = COMPACT_ROW_GAP;
             let label_response = compact_label(ui, track.label, track.accent, label_width, metrics);
-            if label_response.double_clicked() {
+            if double_tapped(&label_response) {
                 changed |= track.reset(value);
             }
 
@@ -349,7 +350,7 @@ fn compact_row<Num: Numeric + Copy>(
                 metrics,
             );
             changed |= value_changed;
-            if value_response.double_clicked() {
+            if double_tapped(&value_response) {
                 changed |= track.reset(value);
             }
         },
@@ -383,7 +384,7 @@ fn stacked_rows<Num: Numeric + Copy>(
             } else {
                 ui.add(egui::Label::new(track.label).sense(Sense::click()))
             };
-            if label_response.double_clicked() {
+            if double_tapped(&label_response) {
                 changed |= track.reset(value);
             }
 
@@ -398,7 +399,7 @@ fn stacked_rows<Num: Numeric + Copy>(
                     metrics,
                 );
                 changed |= value_changed;
-                if value_response.double_clicked() {
+                if double_tapped(&value_response) {
                     changed |= track.reset(value);
                 }
             });
@@ -589,8 +590,9 @@ fn track_widget<Num: Numeric + Copy>(
     }
 
     let mut changed = false;
-    let reset_requested =
-        enabled && (track_response.double_clicked() || handle_response.double_clicked());
+    let reset_requested = enabled
+        && (double_tapped_on(&track_response, drag_id)
+            || double_tapped_on(&handle_response, drag_id));
     if reset_requested {
         changed |= options.reset(value);
     }
@@ -1535,6 +1537,16 @@ mod tests {
         harness.click(READOUT);
         harness.rest(READOUT, 0.4);
         assert!(!harness.modal_open());
+    }
+
+    #[test]
+    fn a_touch_double_tap_on_the_track_may_land_beside_the_first_tap() {
+        let mut harness = Harness::touch();
+        harness.click(pos2(100.0, TRACK_Y));
+        assert_eq!(harness.value, 50);
+        // egui alone needs both taps within 6 points.
+        harness.click(pos2(118.0, TRACK_Y + 4.0));
+        assert_eq!(harness.value, 1, "the reset value is clamped to the range");
     }
 
     #[test]

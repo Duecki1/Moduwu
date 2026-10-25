@@ -15,6 +15,7 @@ mod animated_image;
 mod buttons;
 mod choices;
 mod dialogs;
+mod double_tap;
 mod forms;
 mod frames;
 mod keyboard;
@@ -52,6 +53,7 @@ pub use dialogs::{
     DIALOG_WIDTH_FORM, DIALOG_WIDTH_LARGE, DIALOG_WIDTH_NARROW, DIALOG_WIDTH_PREVIEW,
     DIALOG_WIDTH_WIDE,
 };
+pub use double_tap::{double_tapped, double_tapped_on, DOUBLE_TAP_DELAY};
 pub use forms::{
     checkbox_with_help, combo_box, form_combo, form_combo_with_help, form_row, form_row_with_help,
     heading_with_help, property_row, responsive_combo_box, singleline_text_edit, strong_with_help,
