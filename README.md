@@ -18,6 +18,45 @@ metrics can be switched at runtime, and the "Enabled" toggle shows disabled
 states; Tab moves keyboard focus. `cargo test` renders it headlessly in every
 combination.
 
+## Changes in 4.0
+
+- Menus open as bottom sheets on touch layouts (`Metrics::touch_layout`):
+  `context_menu`, `dropdown_menu` and `overflow_menu` keep their arguments
+  and show a popup on desktop. A sheet rises from the bottom of the viewport
+  with the dialog sheet's frame and backdrop, at most 640 points wide, and
+  closes when a row calls `ui.close()`, the backdrop is tapped, or Escape is
+  pressed. A context menu's sheet opens on a right-click or a long press.
+  Its contents are inset so that headings, chips and other controls line up
+  with the icons of its rows.
+- Breaking: `context_menu` and `dropdown_menu` return `Option<R>`, what the
+  contents returned while the menu shows, instead of the popup's
+  `InnerResponse`.
+- Breaking: `MenuItem` replaces `menu_item`, `context_menu_item` and
+  `destructive_menu_item`. Add it with `ui.add` or `ui.add_enabled`;
+  `MenuItem::icon` sets the glyph a sheet shows before the label, and
+  `MenuItem::destructive` colours actions such as Delete. In a popup it is a
+  compact text row.
+- Breaking: `submenu` replaces `dropdown_submenu`. It takes a `MenuItem` and
+  returns the row's response with what the contents returned while they show.
+  In a sheet the submenu opens as a page with a back row. Like the menu
+  itself, a submenu closes only when a row calls `ui.close()`, so a list of
+  several choices stays open while they are picked.
+- `MenuItem::value`: the current value of what a row sets, shown dimmed at
+  its end, such as a sort order on the row that opens the list of them.
+- `MenuItem::selected`: a row that is one of several choices, with a check
+  mark while selected: before the label in a popup, after it in a sheet.
+- `menu_checkbox_item` shows a switch after its label in a sheet.
+- `menu_title`: the title a sheet shows above its rows, styled as a dialog's
+  header, such as the name of the photo a menu acts on. Popups leave it out.
+  `menu_title_with_close` adds a close button for menus whose options leave
+  them open, such as filters.
+- `menu_sheet_open` and `dismiss_menu_sheet`, for the system back button:
+  going back leaves a submenu's page, then closes the sheet.
+- `touch_hold`, `set_long_press_duration` and `DEFAULT_LONG_PRESS`: long
+  presses timed with the platform's Touch & hold delay rather than egui's,
+  which is twice Android's default. A press fires once, on the frame its
+  delay ends, unless the touch moved; lifting it afterwards is no tap.
+
 ## Changes in 3.4
 
 - `tree` and `TreeRow`: the rows of a collapsible tree, such as a folder

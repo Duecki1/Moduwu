@@ -6,7 +6,7 @@ use crate::metrics::{control_height, SPACE_SM};
 
 /// The switch track for a row of `row_height`: about half the row high and
 /// 1.8 times as wide, so 18 × 32 px on desktop and 22 × 40 px on Android.
-fn track_size(row_height: f32) -> Vec2 {
+pub(crate) fn track_size(row_height: f32) -> Vec2 {
     let height = (row_height * 0.56).round();
     egui::vec2((height * 1.8).round(), height)
 }
@@ -71,13 +71,23 @@ fn switch_row(ui: &mut Ui, value: &mut bool, label: egui::WidgetText, fill: bool
         return response;
     }
 
-    let visuals = ui.visuals();
     let text_pos = egui::pos2(rect.left(), rect.center().y - galley.size().y * 0.5);
-    let text_color = visuals.widgets.inactive.text_color();
+    let text_color = ui.visuals().widgets.inactive.text_color();
+    ui.painter().galley(text_pos, galley, text_color);
     let track_rect = egui::Rect::from_min_size(
         egui::pos2(rect.right() - track.x, rect.center().y - track.y * 0.5),
         track,
     );
+    paint_switch(ui, &response, track_rect, checked);
+    response
+}
+
+/// Paints a switch in `track_rect` for the row `response` belongs to: its
+/// track fills and its knob slides to the end while `checked`, and it shows
+/// the row's hover and focus.
+pub(crate) fn paint_switch(ui: &Ui, response: &Response, track_rect: egui::Rect, checked: bool) {
+    let visuals = ui.visuals();
+    let track = track_rect.size();
     let on = ui.ctx().animate_bool_responsive(response.id, checked);
     let idle = if response.hovered() || response.has_focus() {
         &visuals.widgets.hovered
@@ -105,7 +115,6 @@ fn switch_row(ui: &mut Ui, value: &mut bool, label: egui::WidgetText, fill: bool
         .then(|| Stroke::new(1.5, visuals.widgets.active.bg_stroke.color));
 
     let painter = ui.painter();
-    painter.galley(text_pos, galley, text_color);
     let radius = track.y * 0.5;
     painter.rect(track_rect, radius, fill, stroke, StrokeKind::Inside);
     if let Some(focus) = focus {
@@ -117,7 +126,6 @@ fn switch_row(ui: &mut Ui, value: &mut bool, label: egui::WidgetText, fill: bool
         );
     }
     painter.circle_filled(egui::pos2(knob_x, track_rect.center().y), knob_radius, knob);
-    response
 }
 
 fn lerp_color(from: Color32, to: Color32, t: f32) -> Color32 {

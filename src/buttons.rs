@@ -519,7 +519,10 @@ mod tests {
             ),
             (
                 "Rename",
-                Box::new(|ui| crate::context_menu_item(ui, true, "Rename").rect),
+                Box::new(|ui| {
+                    crate::menus::menu_popup_style().apply(ui.style_mut());
+                    ui.add(crate::MenuItem::new("Rename")).rect
+                }),
             ),
             ("4:3", Box::new(|ui| crate::chip(ui, "4:3", false).rect)),
             (

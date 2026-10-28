@@ -3,18 +3,19 @@
 //!
 //! Run with `cargo run --example gallery`. Tab moves keyboard focus through
 //! the controls; the "Disabled" toggle shows every control's disabled state.
+//! With Android metrics, menus open as bottom sheets.
 
 use eframe::egui::{self, Color32, Ui};
 use moduwu_design::{
     action_row, checkbox_with_help, chip, content_card, destructive_button,
     dialog_confirmation_actions, dialog_confirmation_buttons, dialog_window, dropdown_menu,
     form_combo, form_row, form_row_with_help, full_width_button, ghost_icon_button,
-    ghost_icon_toggle_button, icon_button, icon_toggle_button, menu_checkbox_item, menu_item,
+    ghost_icon_toggle_button, icon_button, icon_toggle_button, menu_checkbox_item, menu_title,
     navigation_row, panel_title, primary_button, secondary_button, section_card,
-    section_card_with_help, segmented_button, segmented_control, singleline_text_edit, tab_button,
-    toggle, toggle_button, toggle_row, toggle_with_help, toolbar_button, toolbar_row, tree,
-    AngleDial, AnimatedImage, Design, Dialog, DialogAction, DialogKeyboard, DialogPreview,
-    DialogSize, Metrics, NumberField, Slider, SliderLayout, SliderScale, TreeRow,
+    section_card_with_help, segmented_button, segmented_control, singleline_text_edit, submenu,
+    tab_button, toggle, toggle_button, toggle_row, toggle_with_help, toolbar_button, toolbar_row,
+    tree, AngleDial, AnimatedImage, Design, Dialog, DialogAction, DialogKeyboard, DialogPreview,
+    DialogSize, MenuItem, Metrics, NumberField, Slider, SliderLayout, SliderScale, TreeRow,
     DIALOG_WIDTH_FORM, DIALOG_WIDTH_PREVIEW,
 };
 
@@ -287,9 +288,20 @@ impl Gallery {
                 ui.strong("Navigation and menus");
                 let menu = secondary_button(ui, "Menu");
                 dropdown_menu(&menu, |ui| {
-                    menu_item(ui, true, "Enabled item");
-                    menu_item(ui, false, "Disabled item");
+                    menu_title(ui, "Menu");
+                    let _ = ui.add(MenuItem::new("Enabled item").icon("📋"));
+                    let _ = ui.add_enabled(false, MenuItem::new("Disabled item").icon("📋"));
                     menu_checkbox_item(ui, &mut self.checked, "Checkable item");
+                    submenu(ui, MenuItem::new("Submenu").icon("🗀"), |ui| {
+                        let _ = ui.add(MenuItem::new("Nested item"));
+                    });
+                    ui.separator();
+                    if ui
+                        .add(MenuItem::new("Delete").icon("🗑").destructive())
+                        .clicked()
+                    {
+                        ui.close();
+                    }
                 });
                 if secondary_button(ui, "Dialog").clicked() {
                     self.dialog_open = true;

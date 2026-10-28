@@ -2,8 +2,8 @@
 //!
 //! The crate intentionally owns only presentation concerns: palette-driven
 //! theme application, layout metrics, frames/cards, common buttons and form
-//! controls, switches, segmented controls and chips, tree rows, popup helpers,
-//! dialogs (modal ones, and one that pairs an image preview with its
+//! controls, switches, segmented controls and chips, tree rows, menus (popups
+//! on desktop, bottom sheets on touch layouts), long presses, dialogs (modal ones, and one that pairs an image preview with its
 //! controls), short animated clips, and responsive layout utilities, including
 //! scrolling a
 //! newly revealed widget into view and keeping dialogs above an on-screen
@@ -20,6 +20,7 @@ mod double_tap;
 mod forms;
 mod frames;
 mod keyboard;
+mod menu_sheet;
 mod menus;
 mod metrics;
 mod modal_dialog;
@@ -34,6 +35,7 @@ mod switch;
 mod test_support;
 mod theme;
 mod tooltip;
+mod touch_hold;
 mod tree;
 mod value_entry;
 
@@ -70,9 +72,10 @@ pub use frames::{
 pub use keyboard::{
     keyboard_inset, numeric_keyboard_requested, set_keyboard_inset, unobscured_content_rect,
 };
+pub use menu_sheet::{dismiss_menu_sheet, menu_sheet_open};
 pub use menus::{
-    context_menu, context_menu_item, destructive_menu_item, dropdown_menu, dropdown_submenu,
-    menu_checkbox_item, menu_item, overflow_menu,
+    context_menu, dropdown_menu, menu_checkbox_item, menu_title, menu_title_with_close,
+    overflow_menu, submenu, MenuItem,
 };
 pub use metrics::{
     Metrics, ANDROID_CONTROL_HEIGHT, CARD_GAP, CARD_RADIUS, CONTENT_MARGIN, CONTROL_HEIGHT,
@@ -96,4 +99,5 @@ pub use slider::{
 pub use switch::{toggle, toggle_row};
 pub use theme::{Palette, Theme, ThemeMode};
 pub use tooltip::still_hover_text;
+pub use touch_hold::{set_long_press_duration, touch_hold, TouchHold, DEFAULT_LONG_PRESS};
 pub use tree::{tree, TreeRow, TreeRowResponse};

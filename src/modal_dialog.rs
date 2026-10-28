@@ -35,7 +35,7 @@ impl DialogSize {
 /// Touch layouts narrower than this show dialogs as bottom sheets.
 const SHEET_BREAKPOINT: f32 = 600.0;
 /// A bottom sheet leaves the top of the viewport visible.
-const SHEET_MAX_HEIGHT_FRACTION: f32 = 0.9;
+pub(crate) const SHEET_MAX_HEIGHT_FRACTION: f32 = 0.9;
 const SHEET_CORNER_RADIUS: u8 = 14;
 
 /// Where a dialog sits in the viewport and how large it may grow.
@@ -63,6 +63,23 @@ impl Placement {
             }
         }
     }
+}
+
+/// The frame of a bottom sheet: a window frame whose top corners are
+/// rounded. Dialogs and menu sheets share it.
+pub(crate) fn sheet_frame(style: &egui::Style) -> egui::Frame {
+    let radius = SHEET_CORNER_RADIUS;
+    egui::Frame::window(style).corner_radius(CornerRadius {
+        nw: radius,
+        ne: radius,
+        sw: 0,
+        se: 0,
+    })
+}
+
+/// The dimmed backdrop behind modal dialogs and menu sheets.
+pub(crate) fn backdrop_color(style: &egui::Style) -> Color32 {
+    Color32::from_black_alpha(if style.visuals.dark_mode { 140 } else { 90 })
 }
 
 /// A modal dialog. The backdrop dims and blocks the rest of the UI; on narrow
@@ -212,20 +229,12 @@ impl Dialog {
         let viewport = unobscured_content_rect(ctx);
         let placement = Placement::for_viewport(viewport, metrics, size);
         let style = ctx.global_style();
-        let mut frame = egui::Frame::window(&style);
-        let anchor = if placement.sheet {
-            let radius = SHEET_CORNER_RADIUS;
-            frame = frame.corner_radius(CornerRadius {
-                nw: radius,
-                ne: radius,
-                sw: 0,
-                se: 0,
-            });
-            Align2::CENTER_BOTTOM
+        let (frame, anchor) = if placement.sheet {
+            (sheet_frame(&style), Align2::CENTER_BOTTOM)
         } else {
-            Align2::CENTER_CENTER
+            (egui::Frame::window(&style), Align2::CENTER_CENTER)
         };
-        let backdrop = Color32::from_black_alpha(if style.visuals.dark_mode { 140 } else { 90 });
+        let backdrop = backdrop_color(&style);
         let chrome = frame.total_margin().sum();
         let inner_width = (placement.width - chrome.x).max(1.0);
         let item_spacing = style.spacing.item_spacing.y;

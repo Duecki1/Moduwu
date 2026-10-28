@@ -12,6 +12,30 @@ pub(crate) fn key_press(key: egui::Key) -> egui::Event {
     }
 }
 
+/// A touch at `pos`, with the pointer events egui's integrations send with
+/// it.
+pub(crate) fn touch(phase: egui::TouchPhase, pos: Pos2) -> Vec<egui::Event> {
+    let touch = egui::Event::Touch {
+        device_id: egui::TouchDeviceId(0),
+        id: egui::TouchId(0),
+        phase,
+        pos,
+        force: None,
+    };
+    let button = |pressed| egui::Event::PointerButton {
+        pos,
+        button: egui::PointerButton::Primary,
+        pressed,
+        modifiers: egui::Modifiers::NONE,
+    };
+    let pointer = match phase {
+        egui::TouchPhase::Start => vec![egui::Event::PointerMoved(pos), button(true)],
+        egui::TouchPhase::Move => vec![egui::Event::PointerMoved(pos)],
+        egui::TouchPhase::End | egui::TouchPhase::Cancel => vec![button(false)],
+    };
+    std::iter::once(touch).chain(pointer).collect()
+}
+
 /// Runs one frame of `show` and returns its accessibility and click events.
 pub(crate) fn run_frame(
     ctx: &egui::Context,
