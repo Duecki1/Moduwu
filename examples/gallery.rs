@@ -12,10 +12,10 @@ use moduwu_design::{
     ghost_icon_toggle_button, icon_button, icon_toggle_button, menu_checkbox_item, menu_item,
     navigation_row, panel_title, primary_button, secondary_button, section_card,
     section_card_with_help, segmented_button, segmented_control, singleline_text_edit, tab_button,
-    toggle, toggle_button, toggle_row, toggle_with_help, toolbar_button, toolbar_row, AngleDial,
-    AnimatedImage, Design, Dialog, DialogAction, DialogKeyboard, DialogPreview, DialogSize,
-    Metrics, NumberField, Slider, SliderLayout, SliderScale, DIALOG_WIDTH_FORM,
-    DIALOG_WIDTH_PREVIEW,
+    toggle, toggle_button, toggle_row, toggle_with_help, toolbar_button, toolbar_row, tree,
+    AngleDial, AnimatedImage, Design, Dialog, DialogAction, DialogKeyboard, DialogPreview,
+    DialogSize, Metrics, NumberField, Slider, SliderLayout, SliderScale, TreeRow,
+    DIALOG_WIDTH_FORM, DIALOG_WIDTH_PREVIEW,
 };
 
 fn main() -> eframe::Result {
@@ -51,6 +51,9 @@ struct Gallery {
     compact_sliders: bool,
     toggled: bool,
     tab: usize,
+    /// The selected row of `FOLDERS`, and whether its first row is expanded.
+    folder: usize,
+    folders_expanded: bool,
     checked: bool,
     text: String,
     count: u32,
@@ -80,6 +83,8 @@ impl Default for Gallery {
             compact_sliders: false,
             toggled: false,
             tab: 0,
+            folder: 1,
+            folders_expanded: true,
             checked: true,
             text: "Editable text".to_owned(),
             count: 12,
@@ -100,6 +105,10 @@ impl Default for Gallery {
 }
 
 const CHOICES: [&str; 3] = ["Balanced", "Detailed", "Fast"];
+
+/// A tree's rows and their depths; the rows at depth 1 are children of the
+/// first.
+const FOLDERS: [(&str, usize); 4] = [("Photos", 0), ("2025", 1), ("2026", 1), ("Exports", 0)];
 
 impl eframe::App for Gallery {
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
@@ -297,6 +306,26 @@ impl Gallery {
                     self.tab = index;
                 }
             }
+            ui.separator();
+            tree(ui, |ui| {
+                for (index, (label, depth)) in FOLDERS.into_iter().enumerate() {
+                    if depth > 0 && !self.folders_expanded {
+                        continue;
+                    }
+                    let row = TreeRow::new(index, label)
+                        .depth(depth)
+                        .expanded((index == 0).then_some(self.folders_expanded))
+                        .icon("🗀")
+                        .selected(self.folder == index)
+                        .show(ui);
+                    if row.toggled() {
+                        self.folders_expanded = !self.folders_expanded;
+                    }
+                    if row.row.clicked() {
+                        self.folder = index;
+                    }
+                }
+            });
         });
     }
 

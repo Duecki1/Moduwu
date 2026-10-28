@@ -2,9 +2,10 @@
 //!
 //! The crate intentionally owns only presentation concerns: palette-driven
 //! theme application, layout metrics, frames/cards, common buttons and form
-//! controls, switches, segmented controls and chips, popup helpers, dialogs
-//! (modal ones, and one that pairs an image preview with its controls), short
-//! animated clips, and responsive layout utilities, including scrolling a
+//! controls, switches, segmented controls and chips, tree rows, popup helpers,
+//! dialogs (modal ones, and one that pairs an image preview with its
+//! controls), short animated clips, and responsive layout utilities, including
+//! scrolling a
 //! newly revealed widget into view and keeping dialogs above an on-screen
 //! keyboard.
 //! Applications are expected to keep their own theme selection, persistence,
@@ -33,6 +34,7 @@ mod switch;
 mod test_support;
 mod theme;
 mod tooltip;
+mod tree;
 mod value_entry;
 
 pub use angle_dial::{AngleDial, SNAP_DEGREES};
@@ -94,3 +96,4 @@ pub use slider::{
 pub use switch::{toggle, toggle_row};
 pub use theme::{Palette, Theme, ThemeMode};
 pub use tooltip::still_hover_text;
+pub use tree::{tree, TreeRow, TreeRowResponse};

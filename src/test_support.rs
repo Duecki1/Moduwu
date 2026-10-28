@@ -83,8 +83,9 @@ pub(crate) fn label_positions_idle_and_hovered(
         let pos = output
             .shapes
             .iter()
-            .find_map(|clipped| text_pos(&clipped.shape, text))
-            .expect("the label is painted");
+            .find_map(|clipped| painted_text(&clipped.shape, text))
+            .expect("the label is painted")
+            .pos;
         (rect, pos)
     };
     let (rect, _) = paint(vec![egui::Event::PointerMoved(egui::pos2(-50.0, -50.0))]);
@@ -94,10 +95,18 @@ pub(crate) fn label_positions_idle_and_hovered(
     (idle, hovered)
 }
 
-fn text_pos(shape: &egui::Shape, text: &str) -> Option<Pos2> {
+/// The layout rect of `text` among a frame's `shapes`.
+pub(crate) fn painted_text_rect(shapes: &[egui::epaint::ClippedShape], text: &str) -> Option<Rect> {
+    shapes
+        .iter()
+        .find_map(|clipped| painted_text(&clipped.shape, text))
+        .map(|shape| shape.galley.rect.translate(shape.pos.to_vec2()))
+}
+
+fn painted_text<'a>(shape: &'a egui::Shape, text: &str) -> Option<&'a egui::epaint::TextShape> {
     match shape {
-        egui::Shape::Text(shape) if shape.galley.text() == text => Some(shape.pos),
-        egui::Shape::Vec(shapes) => shapes.iter().find_map(|shape| text_pos(shape, text)),
+        egui::Shape::Text(shape) if shape.galley.text() == text => Some(shape),
+        egui::Shape::Vec(shapes) => shapes.iter().find_map(|shape| painted_text(shape, text)),
         _ => None,
     }
 }

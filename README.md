@@ -4,8 +4,8 @@ A standalone Rust library for egui 0.35, extracted from CalibRaw. It provides
 six theme presets (Obsidian Blue, Obsidian Red, Porcelain, Daylight, and
 Plain Grey in dark and light),
 custom palette support, spacing and sizing metrics, cards, toolbar rows,
-buttons, form controls, numeric fields, sliders, menus, dialogs, animated
-clips, and responsive layout helpers.
+buttons, form controls, numeric fields, sliders, tree rows, menus, dialogs,
+animated clips, and responsive layout helpers.
 
 ## Gallery
 
@@ -17,6 +17,15 @@ The gallery shows every reusable control in each theme. Desktop and Android
 metrics can be switched at runtime, and the "Enabled" toggle shows disabled
 states; Tab moves keyboard focus. `cargo test` renders it headlessly in every
 combination.
+
+## Changes in 3.4
+
+- `tree` and `TreeRow`: the rows of a collapsible tree, such as a folder
+  hierarchy. Each row is indented by its depth, with a disclosure arrow when it
+  has children, an optional icon and its label; a child's arrow sits under its
+  parent's icon, and guide lines hang from each ancestor's arrow. Hover and
+  selection fill the whole row. The caller shows the children of expanded rows
+  and flips the expanded state when `TreeRowResponse::toggled` reports it.
 
 ## Changes in 3.3
 
