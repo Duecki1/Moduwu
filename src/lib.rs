@@ -2,7 +2,8 @@
 //!
 //! The crate intentionally owns only presentation concerns: palette-driven
 //! theme application, layout metrics, frames/cards, common buttons and form
-//! controls, switches, segmented controls and chips, tree rows, menus (popups
+//! controls, switches, segmented controls and chips, icon tiles and the
+//! pickers that hold them, tree rows, menus (popups
 //! on desktop, bottom sheets on touch layouts), long presses, dialogs (modal ones, and one that pairs an image preview with its
 //! controls), short animated clips, and responsive layout utilities, including
 //! scrolling a
@@ -34,6 +35,7 @@ mod switch;
 #[cfg(test)]
 mod test_support;
 mod theme;
+mod tiles;
 mod tooltip;
 mod touch_hold;
 mod tree;
@@ -98,6 +100,7 @@ pub use slider::{
 };
 pub use switch::{toggle, toggle_row};
 pub use theme::{Palette, Theme, ThemeMode};
+pub use tiles::{picker_menu, picker_popup, tile_width, IconTile, PickerPlacement, TileSize};
 pub use tooltip::still_hover_text;
 pub use touch_hold::{set_long_press_duration, touch_hold, TouchHold, DEFAULT_LONG_PRESS};
 pub use tree::{tree, TreeRow, TreeRowResponse};
