@@ -70,6 +70,8 @@ pub(crate) struct Tag {
     /// The menu or submenu the contents belong to. Submenu ids derive from
     /// it, so they match whether the contents show or run unseen.
     page: Id,
+    /// The sheet's fill in place of the window fill, kept on submenu pages.
+    fill: Option<Color32>,
 }
 
 /// The sheet `ui`'s contents are added to, if any.
@@ -143,11 +145,26 @@ pub(crate) fn show<R>(
     menu: Id,
     add_contents: impl FnOnce(&mut Ui) -> R,
 ) -> Option<R> {
+    show_filled(ctx, menu, None, add_contents)
+}
+
+/// [`show`], with the sheet and its submenu pages filled with `fill` in
+/// place of the window fill when it is set.
+pub(crate) fn show_filled<R>(
+    ctx: &Context,
+    menu: Id,
+    fill: Option<Color32>,
+    add_contents: impl FnOnce(&mut Ui) -> R,
+) -> Option<R> {
     let mut sheet = current(ctx).filter(|sheet| sheet.menu == menu)?;
     sheet.shown_frame = ctx.cumulative_frame_nr();
     let showing_page = !sheet.pages.is_empty();
     ctx.data_mut(|data| data.insert_temp(sheet_id(), sheet));
-    let tag = Tag { menu, page: menu };
+    let tag = Tag {
+        menu,
+        page: menu,
+        fill,
+    };
     if showing_page {
         let mut unseen = Ui::new(
             ctx.clone(),
@@ -191,6 +208,7 @@ pub(crate) fn submenu<R>(
     let page = Tag {
         menu: tag.menu,
         page: id,
+        fill: tag.fill,
     };
     let inner = match depth {
         // Only rows on the page that shows can be tapped.
@@ -249,7 +267,10 @@ fn show_page<R>(
 ) -> (R, Outcome) {
     let viewport = unobscured_content_rect(ctx);
     let style = ctx.global_style();
-    let frame = sheet_frame(&style);
+    let mut frame = sheet_frame(&style);
+    if let Some(fill) = tag.fill {
+        frame = frame.fill(fill);
+    }
     let chrome = frame.total_margin().sum();
     let inner_width = (viewport.width().min(MAX_WIDTH) - chrome.x).max(1.0);
     let max_height = viewport.height() * SHEET_MAX_HEIGHT_FRACTION - chrome.y;

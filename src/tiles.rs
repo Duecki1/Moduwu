@@ -1,7 +1,7 @@
 //! Icon tiles, framed buttons that show an icon above a name, and the popup
 //! that holds a grid of them for picking one.
 
-use egui::{self, Response, Sense, StrokeKind, TextWrapMode, Ui, Widget};
+use egui::{self, Color32, Response, RichText, Sense, StrokeKind, TextWrapMode, Ui, Widget};
 
 use crate::buttons::interaction_visuals;
 use crate::menu_sheet;
@@ -176,6 +176,125 @@ pub enum PickerPlacement {
     Left,
 }
 
+/// A picker: choices such as [`IconTile`]s that open from a button, with an
+/// optional title centred above them and an optional fill. A choice closes
+/// it. [`picker_popup`] and [`picker_menu`] show one without a title or fill.
+#[must_use]
+pub struct Picker<'a> {
+    min_width: f32,
+    placement: PickerPlacement,
+    title: Option<&'a str>,
+    fill: Option<Color32>,
+}
+
+impl<'a> Picker<'a> {
+    /// A picker at least `min_width` wide, placed beside its button as
+    /// `placement` says when it opens as a popup.
+    pub fn new(min_width: f32, placement: PickerPlacement) -> Self {
+        Self {
+            min_width,
+            placement,
+            title: None,
+            fill: None,
+        }
+    }
+
+    /// A title centred above the choices, naming what picking one does.
+    pub fn title(mut self, title: &'a str) -> Self {
+        self.title = Some(title);
+        self
+    }
+
+    /// Fills the popup or sheet with `fill` in place of the window fill, for
+    /// example a tint matching the button that opened it. The choices keep
+    /// their own fills. Pass an opaque colour; the picker shows over others.
+    pub fn fill(mut self, fill: Color32) -> Self {
+        self.fill = Some(fill);
+        self
+    }
+
+    /// Opens the picker as a popup when `button` is clicked. It scrolls when
+    /// its contents are taller than the room on its side. `add_contents`
+    /// draws the choices and returns the one clicked, which closes the popup.
+    /// Returns that choice.
+    pub fn show_popup<R>(
+        self,
+        button: &Response,
+        add_contents: impl FnOnce(&mut Ui) -> Option<R>,
+    ) -> Option<R> {
+        let screen = button.ctx.content_rect();
+        let gap = SPACE_XS;
+        // Chosen here rather than by egui, which learns the popup's height
+        // only after showing it once and would move it on the second frame.
+        let (align, size) = match self.placement {
+            PickerPlacement::BelowOrAbove => {
+                let room_above = button.rect.top() - screen.top();
+                let room_below = screen.bottom() - button.rect.bottom();
+                let align = if room_below >= room_above {
+                    egui::RectAlign::BOTTOM_START
+                } else {
+                    egui::RectAlign::TOP_START
+                };
+                let size = egui::vec2(
+                    button.rect.width().max(self.min_width),
+                    room_above.max(room_below) - 2.0 * gap,
+                );
+                (align, size)
+            }
+            PickerPlacement::Left => (
+                egui::RectAlign::LEFT_START,
+                egui::vec2(
+                    self.min_width,
+                    screen.bottom() - button.rect.top() - 2.0 * gap,
+                ),
+            ),
+        };
+        let title = self.title;
+        // Not a menu: menus draw idle buttons flat, and tiles keep their frame.
+        let mut popup = egui::Popup::from_toggle_button_response(button)
+            .align(align)
+            .align_alternatives(&[])
+            .gap(gap)
+            .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside);
+        if let Some(fill) = self.fill {
+            popup = popup.frame(egui::Frame::popup(&button.ctx.global_style()).fill(fill));
+        }
+        popup
+            .show(|ui| picker_body(ui, size, title, add_contents))
+            .and_then(|response| response.inner)
+    }
+
+    /// Opens the picker as menus open: [`Picker::show_popup`] on pointer
+    /// layouts, and on touch layouts a sheet rising from the bottom of the
+    /// viewport, as wide as the viewport up to the sheets' limit. A choice
+    /// closes either. Returns what `add_contents` picked.
+    pub fn show_menu<R>(
+        self,
+        button: &Response,
+        add_contents: impl FnOnce(&mut Ui) -> Option<R>,
+    ) -> Option<R> {
+        let ctx = &button.ctx;
+        if !Metrics::of(ctx).touch_layout {
+            return self.show_popup(button, add_contents);
+        }
+        if button.clicked() {
+            menu_sheet::open(ctx, button.id);
+        }
+        let title = self.title;
+        menu_sheet::show_filled(ctx, button.id, self.fill, |ui| {
+            if let Some(title) = title {
+                picker_title(ui, title);
+            }
+            let picked = add_contents(ui);
+            if picked.is_some() {
+                ui.close();
+            }
+            picked
+        })
+        .flatten()
+    }
+}
+
 /// Opens a picker when `button` is clicked: a popup at least `min_width`
 /// wide that scrolls when its contents are taller than the room on its side.
 /// `add_contents` draws the choices and returns the one clicked, which
@@ -186,38 +305,7 @@ pub fn picker_popup<R>(
     placement: PickerPlacement,
     add_contents: impl FnOnce(&mut Ui) -> Option<R>,
 ) -> Option<R> {
-    let screen = button.ctx.content_rect();
-    let gap = SPACE_XS;
-    // Chosen here rather than by egui, which learns the popup's height only
-    // after showing it once and would move it on the second frame.
-    let (align, size) = match placement {
-        PickerPlacement::BelowOrAbove => {
-            let room_above = button.rect.top() - screen.top();
-            let room_below = screen.bottom() - button.rect.bottom();
-            let align = if room_below >= room_above {
-                egui::RectAlign::BOTTOM_START
-            } else {
-                egui::RectAlign::TOP_START
-            };
-            let size = egui::vec2(
-                button.rect.width().max(min_width),
-                room_above.max(room_below) - 2.0 * gap,
-            );
-            (align, size)
-        }
-        PickerPlacement::Left => (
-            egui::RectAlign::LEFT_START,
-            egui::vec2(min_width, screen.bottom() - button.rect.top() - 2.0 * gap),
-        ),
-    };
-    // Not a menu: menus draw idle buttons flat, and tiles keep their frame.
-    egui::Popup::from_toggle_button_response(button)
-        .align(align)
-        .align_alternatives(&[])
-        .gap(gap)
-        .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
-        .show(|ui| picker_body(ui, size, add_contents))
-        .and_then(|response| response.inner)
+    Picker::new(min_width, placement).show_popup(button, add_contents)
 }
 
 /// A picker that opens as menus do: [`picker_popup`] on pointer layouts, and
@@ -230,35 +318,36 @@ pub fn picker_menu<R>(
     placement: PickerPlacement,
     add_contents: impl FnOnce(&mut Ui) -> Option<R>,
 ) -> Option<R> {
-    let ctx = &button.ctx;
-    if !Metrics::of(ctx).touch_layout {
-        return picker_popup(button, min_width, placement, add_contents);
-    }
-    if button.clicked() {
-        menu_sheet::open(ctx, button.id);
-    }
-    menu_sheet::show(ctx, button.id, |ui| {
-        let picked = add_contents(ui);
-        if picked.is_some() {
-            ui.close();
-        }
-        picked
-    })
-    .flatten()
+    Picker::new(min_width, placement).show_menu(button, add_contents)
 }
 
-/// Fills a popup of at most `size` with a scroll area around `add_contents`,
-/// and closes the popup once it returns a choice.
+/// A picker's title, centred above its choices at the size of a panel's.
+fn picker_title(ui: &mut Ui, title: &str) {
+    let size = Metrics::of(ui.ctx()).panel_title_text_size;
+    ui.vertical_centered(|ui| {
+        ui.add(egui::Label::new(RichText::new(title).strong().size(size)).truncate());
+    });
+    ui.add_space(SPACE_XS);
+}
+
+/// Fills a popup of at most `size` with `title` above a scroll area around
+/// `add_contents`, and closes the popup once it returns a choice.
 fn picker_body<R>(
     ui: &mut Ui,
     size: egui::Vec2,
+    title: Option<&str>,
     add_contents: impl FnOnce(&mut Ui) -> Option<R>,
 ) -> Option<R> {
     // The popup frame's margin and border lie outside the contents.
-    let size = size
+    let mut size = size
         - ui.spacing().menu_margin.sum()
         - egui::Vec2::splat(2.0 * ui.visuals().window_stroke.width);
     ui.set_width(size.x);
+    if let Some(title) = title {
+        let top = ui.cursor().top();
+        picker_title(ui, title);
+        size.y -= ui.cursor().top() - top;
+    }
     // A solid scrollbar, so a picker taller than its room shows that more
     // choices follow.
     let mut scroll = egui::style::ScrollStyle::solid();
@@ -302,6 +391,46 @@ mod tests {
         assert_eq!(info.typ, egui::WidgetType::Button);
         assert_eq!(info.label.as_deref(), Some("Subject"));
         assert_eq!(info.selected, Some(true));
+    }
+
+    #[test]
+    fn a_titled_picker_shows_its_title_above_choices_that_close_it() {
+        use crate::test_support::painted_text_rect;
+        use std::cell::Cell;
+
+        let ctx = egui::Context::default();
+        let tile = Cell::new(egui::Rect::NOTHING);
+        let picked = Cell::new(None);
+        let mut show = |ui: &mut Ui| {
+            let button = ui.button("Open");
+            let choice = Picker::new(200.0, PickerPlacement::BelowOrAbove)
+                .title("Add sub-mask")
+                .fill(Color32::DARK_GREEN)
+                .show_popup(&button, |ui| {
+                    let response = ui.add(IconTile::new("+", "Radial").width(120.0));
+                    tile.set(response.rect);
+                    response.clicked().then_some("radial")
+                });
+            if choice.is_some() {
+                picked.set(choice);
+            }
+            button.rect
+        };
+        click(&ctx, &mut show, |button| button.center());
+        let output = ctx.run_ui(egui::RawInput::default(), |ui| {
+            show(ui);
+        });
+        let title = painted_text_rect(&output.shapes, "Add sub-mask").expect("the title shows");
+        assert!(title.bottom() <= tile.get().top());
+        click(
+            &ctx,
+            |ui| {
+                show(ui);
+                tile.get()
+            },
+            |tile| tile.center(),
+        );
+        assert_eq!(picked.get(), Some("radial"));
     }
 
     #[test]

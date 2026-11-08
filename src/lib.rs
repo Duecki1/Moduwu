@@ -100,7 +100,9 @@ pub use slider::{
 };
 pub use switch::{toggle, toggle_row};
 pub use theme::{Palette, Theme, ThemeMode};
-pub use tiles::{picker_menu, picker_popup, tile_width, IconTile, PickerPlacement, TileSize};
+pub use tiles::{
+    picker_menu, picker_popup, tile_width, IconTile, Picker, PickerPlacement, TileSize,
+};
 pub use tooltip::still_hover_text;
 pub use touch_hold::{set_long_press_duration, touch_hold, TouchHold, DEFAULT_LONG_PRESS};
 pub use tree::{tree, TreeRow, TreeRowResponse};
