@@ -98,7 +98,7 @@ pub use slider::{
     lock_slider_scroll, slider_scroll_locked, Slider, SliderLayout, SliderMetrics, SliderResponse,
     SliderScale,
 };
-pub use switch::{toggle, toggle_row};
+pub use switch::{toggle, toggle_row, toggle_switch};
 pub use theme::{Palette, Theme, ThemeMode};
 pub use tiles::{
     picker_menu, picker_popup, tile_width, IconTile, Picker, PickerPlacement, TileSize,

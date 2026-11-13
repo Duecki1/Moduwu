@@ -13,10 +13,10 @@ use moduwu_design::{
     ghost_icon_toggle_button, icon_button, icon_toggle_button, menu_checkbox_item, menu_title,
     navigation_row, panel_title, primary_button, secondary_button, section_card,
     section_card_with_help, segmented_button, segmented_control, singleline_text_edit, submenu,
-    tab_button, toggle, toggle_button, toggle_row, toggle_with_help, toolbar_button, toolbar_row,
-    tree, AngleDial, AnimatedImage, Design, Dialog, DialogAction, DialogKeyboard, DialogPreview,
-    DialogSize, MenuItem, Metrics, NumberField, Slider, SliderLayout, SliderScale, TreeRow,
-    DIALOG_WIDTH_FORM, DIALOG_WIDTH_PREVIEW,
+    tab_button, toggle, toggle_button, toggle_row, toggle_switch, toggle_with_help, toolbar_button,
+    toolbar_row, tree, AngleDial, AnimatedImage, Design, Dialog, DialogAction, DialogKeyboard,
+    DialogPreview, DialogSize, MenuItem, Metrics, NumberField, Slider, SliderLayout, SliderScale,
+    TreeRow, DIALOG_WIDTH_FORM, DIALOG_WIDTH_PREVIEW,
 };
 
 fn main() -> eframe::Result {
@@ -205,6 +205,7 @@ impl Gallery {
                     self.toggled = !self.toggled;
                 }
                 toggle(ui, &mut self.toggled, "Switch");
+                toggle_switch(ui, &mut self.toggled, "Bare switch");
             });
         });
 

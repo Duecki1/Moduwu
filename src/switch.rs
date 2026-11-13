@@ -32,6 +32,36 @@ pub fn toggle_row(ui: &mut Ui, value: &mut bool, label: impl Into<egui::WidgetTe
     switch_row(ui, value, label.into(), true)
 }
 
+/// A switch without a visible label, for rows that already name what it turns
+/// on, such as a card header beside its title. `label` names it for assistive
+/// technology, which sees a checkbox with its checked state. Clicking it, or
+/// Space and Enter while it has focus, flips `value` and marks the response
+/// changed.
+pub fn toggle_switch(ui: &mut Ui, value: &mut bool, label: impl Into<String>) -> Response {
+    let label = label.into();
+    let height = control_height(ui);
+    let track = track_size(height);
+    let (rect, mut response) = ui.allocate_exact_size(egui::vec2(track.x, height), Sense::click());
+    if response.clicked() {
+        *value = !*value;
+        response.mark_changed();
+    }
+    let (enabled, checked) = (ui.is_enabled(), *value);
+    response.widget_info(|| {
+        egui::WidgetInfo::selected(egui::WidgetType::Checkbox, enabled, checked, &label)
+    });
+    if response.hovered() {
+        if let Some(cursor) = ui.visuals().interact_cursor {
+            ui.ctx().set_cursor_icon(cursor);
+        }
+    }
+    if ui.is_rect_visible(rect) {
+        let track_rect = egui::Rect::from_center_size(rect.center(), track);
+        paint_switch(ui, &response, track_rect, checked);
+    }
+    response
+}
+
 fn switch_row(ui: &mut Ui, value: &mut bool, label: egui::WidgetText, fill: bool) -> Response {
     let text = label.text().to_owned();
     let height = control_height(ui);
@@ -170,6 +200,28 @@ mod tests {
         let (changed, _) = click_toggle(&mut value, true);
         assert!(!value);
         assert!(changed);
+    }
+
+    #[test]
+    fn bare_switches_flip_and_name_themselves_for_assistive_technology() {
+        let ctx = egui::Context::default();
+        let mut value = true;
+        let mut changed = false;
+        let events = click(
+            &ctx,
+            |ui| {
+                let response = toggle_switch(ui, &mut value, "Light");
+                changed |= response.changed();
+                response.rect
+            },
+            |rect| rect.center(),
+        );
+        assert!(!value);
+        assert!(changed);
+        let info = last_widget_info(&events).expect("switch reports its click");
+        assert_eq!(info.typ, egui::WidgetType::Checkbox);
+        assert_eq!(info.selected, Some(false));
+        assert_eq!(info.label.as_deref(), Some("Light"));
     }
 
     #[test]

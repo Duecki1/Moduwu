@@ -18,6 +18,12 @@ metrics can be switched at runtime, and the "Enabled" toggle shows disabled
 states; Tab moves keyboard focus. `cargo test` renders it headlessly in every
 combination.
 
+## Changes in 4.2
+
+- `toggle_switch`: a switch without a visible label, for rows that already
+  name what it turns on, such as a card header. Its label names it for
+  assistive technology.
+
 ## Changes in 4.0
 
 - Menus open as bottom sheets on touch layouts (`Metrics::touch_layout`):
